@@ -1,0 +1,5 @@
+version: "3.9"
+services:
+  random-agent:
+    build: .
+    command: ["python", "src/battler/deploy"]
