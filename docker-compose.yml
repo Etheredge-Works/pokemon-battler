@@ -1,5 +1,14 @@
 version: "3.9"
 services:
-  random-agent:
+  random-player:
     build: .
-    command: ["python", "src/battler/deploy"]
+    environment: 
+      USERNAME: ${USERNAME}
+      PASSWORD: ${PASSWORD}
+    command: ["python", "src/battler/deploy/random_player.py"]
+  base-player:
+    build: .
+    environment: 
+      USERNAME: ${USERNAME}
+      PASSWORD: ${PASSWORD}
+    command: ["python", "src/battler/deploy/base_player.py"]

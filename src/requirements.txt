@@ -25,6 +25,8 @@ arrow==1.1.1
     # via jinja2-time
 astunparse==1.6.3
     # via tensorflow
+asyncio==3.4.3
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 attrs==21.2.0
     # via
     #   cmd2
@@ -233,8 +235,6 @@ kedro==0.17.4
     #   kedro-telemetry
 keras-preprocessing==1.1.2
     # via tensorflow
-keras-rl2==1.0.5
-    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 keras==2.6.0
     # via tensorflow
 mako==1.1.5
@@ -482,9 +482,7 @@ tensorflow-estimator==2.6.0
 tensorflow-probability==0.13.0
     # via tf-agents
 tensorflow==2.6.0
-    # via
-    #   -r /home/ben/projects/pokemon-battler/src/requirements.in
-    #   keras-rl2
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 termcolor==1.1.0
     # via tensorflow
 terminado==0.12.1

@@ -1,0 +1,20 @@
+name: Deploy Random Agent
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    concurrency: pokemon-battler-random
+    # The type of runner that the job will run on
+    runs-on: [self-hosted,ec2-micro,deploy]
+
+    env:
+      USERNAME: ${{ secrets.RANDOM_USERNAME }}
+      PASSWORD: ${{ secrets.RANDOM_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: deploy
+        run: docker-compose up --build -d --remove-orphans --force-recreate random-player

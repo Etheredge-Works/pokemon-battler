@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=python:3.6-buster
+ARG BASE_IMAGE=python:3.8-buster
 FROM $BASE_IMAGE
 
 # install project requirements
@@ -14,7 +14,9 @@ useradd -d /home/kedro -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro
 # copy the whole project except what is in .dockerignore
 WORKDIR /home/kedro
 COPY . .
+RUN pip install -e src
 RUN chown -R kedro:${KEDRO_GID} /home/kedro
+
 USER kedro
 RUN chmod -R a+w /home/kedro
 
