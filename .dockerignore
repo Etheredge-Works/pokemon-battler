@@ -5,6 +5,8 @@
 Dockerfile
 .dockerignore
 
+.git
+
 # ignore potentially sensitive credentials files
 conf/**/*credentials*
 
