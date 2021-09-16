@@ -8,7 +8,7 @@ jobs:
   deploy:
     concurrency: pokemon-battler-random
     # The type of runner that the job will run on
-    runs-on: [self-hosted,ec2-micro,deploy]
+    runs-on: [self-hosted,deploy,4c]
 
     env:
       USERNAME: ${{ secrets.RANDOM_USERNAME }}
