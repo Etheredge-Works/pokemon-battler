@@ -224,14 +224,14 @@ class DQNLightning(pl.LightningModule):
         self,
         env: str,
         replay_size: int = 1_000_000,
-        warm_start_steps: int = 1_000,
+        warm_start_steps: int = 100_000,
         gamma: float = 0.99,
         eps_start: float = 1.0,
         eps_end: float = 0.01,
         eps_last_frame: int = 200_000,
         sync_rate: int = 2_000,
         lr: float = 1e-2,
-        episode_length: int = 100,
+        episode_length: int = 50_000,
         batch_size: int = 32,
         **kwargs,
     ) -> None:
@@ -291,6 +291,7 @@ class DQNLightning(pl.LightningModule):
         states, actions, rewards, dones, next_states = batch
 
         state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        #target_state_action_values = self.target_net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
 
         with torch.no_grad():
             next_state_values = self.target_net(next_states).max(1)[0]

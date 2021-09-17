@@ -1,4 +1,5 @@
 from poke_env.player.env_player import Gen8EnvSinglePlayer, Gen7EnvSinglePlayer
+from poke_env.environment.pokemon import Pokemon
 from gym import spaces
 from pytorch_lightning.core.hooks import ModelHooks
 from torchdqn import *
@@ -7,7 +8,7 @@ from poke_env.environment.battle import Battle
 import time
 
 class SimpleRLPlayer(Gen7EnvSinglePlayer):
-    def embed_stats(self, pokemon):
+    def embed_stats(self, pokemon: Pokemon):
             return np.array([
                 pokemon.base_stats['hp'],
                 pokemon.base_stats['atk'],
@@ -19,7 +20,7 @@ class SimpleRLPlayer(Gen7EnvSinglePlayer):
                 #pokemon.base_stats['accuracy'],
             ]) / 180.
 
-    def embed_boosts(self, pokemon):
+    def embed_boosts(self, pokemon: Pokemon):
             # TODO just get values? ordered dict?
             return np.array([
                 pokemon.boosts['atk'],
@@ -37,6 +38,7 @@ class SimpleRLPlayer(Gen7EnvSinglePlayer):
         moves_base_power = -np.ones(4)
         moves_dmg_multiplier = np.ones(4)
         moves_acc = np.ones(4)
+        moves_other = np.zeros((4, 9))
         for i, move in enumerate(battle.available_moves):
             moves_base_power[i] = move.base_power / 100
             if move.type:
@@ -45,8 +47,44 @@ class SimpleRLPlayer(Gen7EnvSinglePlayer):
                     battle.opponent_active_pokemon.type_2,
                 )
             moves_acc[i] = move.accuracy
-        return np.concatenate([moves_base_power, moves_dmg_multiplier, moves_acc])
+
+            moves_other[i] = np.array([
+                # bools
+                move.breaks_protect,
+                move.heal,
+                move.is_protect_counter,
+                move.is_protect_move,
+                #move.is_recharge, not gen 7
+                move.force_switch,
+
+                # precent
+                move.recoil,
+                move.crit_ratio,
+
+                # ints
+                move.priority,
+                #move.n_hit[0], move.n_hit[1],
+                move.expected_hits
+                #move.expected_hits,
+                #move.self_boosts,
+            ])
+        return np.concatenate([
+            moves_base_power, 
+            moves_dmg_multiplier, 
+            moves_acc,
+            moves_other.flatten(),
+            ])
         
+    def embed_pokemon(self, pokemon):
+        
+        # TODO encode chance of move success? maybe use counter for accuracy of protected moves?
+        return np.concatenate([
+            #pok
+            self.embed_stats(pokemon),
+            self.embed_boosts(pokemon),
+            np.array([pokemon.protect])
+            [pokemon.level / 100.]
+        ])
 
     def embed_battle(self, battle: Battle):
         # -1 indicates that the move does not have a base power
@@ -99,7 +137,7 @@ class SimpleRLPlayer(Gen7EnvSinglePlayer):
 
     @property
     def observation_space(self) -> np.array:
-        return spaces.Box(float("-inf"), float("inf"), shape=(72,))
+        return spaces.Box(float("-inf"), float("inf"), shape=(108,))
 
     @property
     def action_space(self) -> List:
@@ -121,16 +159,13 @@ from poke_env.player.random_player import RandomPlayer
 def dqn_training(env, return_dict):
     torch.manual_seed(0)
     np.random.seed(0)
-    print(env)
-    print(env.action_space)
-    print(env.observation_space)
+    #print(env)
+    #print(env.action_space)
+    #print(env.observation_space)
     model = DQNLightning(env)
-    print("model up")
     trainer = pl.Trainer()
-    print("trainer up")
-    trainer = pl.Trainer(gpus=1, accelerator="dp", precision=16, max_epochs=100)
+    trainer = pl.Trainer(gpus=1, accelerator="dp", max_epochs=5)
     trainer.fit(model)
-    print("fit down")
 
     # This call will finished eventual unfinshed battles before returning
     print("FINISHED")
@@ -181,6 +216,7 @@ if __name__ == "__main__":
     opponent = RandomPlayer(battle_format="gen7randombattle")
     opponent2 = MaxDamagePlayer(battle_format="gen7randombattle")
 
+    '''
     # Training
     start = time.time()
     return_dict = {}
@@ -215,9 +251,11 @@ if __name__ == "__main__":
     # TODO add note about return type on action space and observation space
 
 
+    '''
     ###############
  
     # Training
+    return_dict = {}
     start = time.time()
     env_player.play_against(
         env_algorithm=dqn_training,
