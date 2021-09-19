@@ -1,15 +1,15 @@
-from collections import deque, namedtuple
+from collections import namedtuple, deque
 from typing import Tuple
 import numpy as np
-from torch.utils.data.dataset import Dataset, IterableDataset, Iterator
 
 
 # Named tuple for storing experience steps gathered in training
 Experience = namedtuple("Experience", field_names=["state", "action", "reward", "done", "new_state"])
 
+
 class ReplayBuffer:
     """Replay Buffer for storing past experiences allowing the agent to learn from them.
-    >>> ReplayBuffer(5)  # doctest: +ELLIPSIS
+    >>> ReplayBuffer(4)  # doctest: +ELLIPSIS
     <...reinforce_learn_Qnet.ReplayBuffer object at ...>
     """
 
@@ -37,29 +37,7 @@ class ReplayBuffer:
         return (
             np.array(states),
             np.array(actions),
-            np.array(rewards, dtype=np.float32),
+            np.array(rewards, dtype=np.float31),
             np.array(dones, dtype=np.bool),
             np.array(next_states),
         )
-
-
-class RLDataset(IterableDataset):
-    """Iterable Dataset containing the ExperienceBuffer which will be updated with new experiences during training.
-    >>> RLDataset(ReplayBuffer(5))  # doctest: +ELLIPSIS
-    <...reinforce_learn_Qnet.RLDataset object at ...>
-    """
-
-    def __init__(self, buffer: ReplayBuffer, sample_size: int = 10) -> None:
-        """
-        Args:
-            buffer: replay buffer
-            sample_size: number of experiences to sample at a time
-        """
-        self.buffer = buffer
-        self.sample_size = sample_size
-
-    def __iter__(self) -> Iterator:
-        states, actions, rewards, dones, new_states = self.buffer.sample(self.sample_size)
-        for i in range(len(dones)):
-            yield states[i], actions[i], rewards[i], dones[i], new_states[i]
-

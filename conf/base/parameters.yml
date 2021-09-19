@@ -1,0 +1,34 @@
+epochs: 10
+replay_size: 1_000_000
+warm_start_steps: 200_000
+gamma: 0.99
+eps_start: 1.0
+eps_end: 0.05
+eps_last_frame: 1_000_000
+sync_rate: 5_000
+lr: 1e-3
+episode_length: 100_000
+batch_size: 32
+
+loss_type: mse
+# TODO inject loss function
+
+opponent_type: random
+battle_format: gen7randombattle
+observation_space: 17
+
+dqn_kwargs:
+    hidden_size: 128
+    num_layers: 2
+    #num_heads: 1
+
+reward_kwargs:
+    fainted_value: 1.0
+    hp_value: 0.0
+    #number_of_pokemons: 6
+    #starting_value: 0.0
+    status_value: 0.0
+    victory_value: 1.0
+
+#opponent_name: random
+#oppoennt

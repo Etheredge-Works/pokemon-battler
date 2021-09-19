@@ -31,6 +31,8 @@ from typing import Dict
 
 from kedro.pipeline import Pipeline
 
+from .pipelines.pipeline import create_data_pipeline
+
 
 def register_pipelines() -> Dict[str, Pipeline]:
     """Register the project's pipelines.
@@ -38,4 +40,8 @@ def register_pipelines() -> Dict[str, Pipeline]:
     Returns:
         A mapping from a pipeline name to a ``Pipeline`` object.
     """
-    return {"__default__": Pipeline([])}
+    dqn = create_data_pipeline()
+    return {
+        "dqn": dqn,
+        "__default__": dqn
+    }

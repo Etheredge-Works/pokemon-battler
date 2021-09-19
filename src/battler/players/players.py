@@ -3,28 +3,32 @@ from poke_env.player.random_player import RandomPlayer
 from poke_env.environment.battle import Battle, AbstractBattle
 from poke_env.player.env_player import Gen7EnvSinglePlayer
 from typing import Callable
-from utils import embed_battle
+from ..utils.embed import embed_battle
 import numpy as np
 from typing import List, Dict
 from gym.spaces import Discrete
 from gym import spaces
-import utils
+from battler import utils
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-def build_static_policy(net: nn.Module) -> Callable:
+
+
+def build_static_policy(net: nn.Module, prob: float) -> Callable:
     def policy(battle: AbstractBattle) -> int:
-        encoded_state = embed_battle(battle)
-        return net(encoded_state).argmax().item()
+        if np.random.random() < prob:
+            return np.random.randint(net.action_size)
+        else:
+            encoded_state = embed_battle(battle)
+            return net(encoded_state).argmax().item()
     return policy
 
 
 def build_stocastic_policy(net: nn.Module, prob: float = 1.0) -> Callable:
     def policy(battle: AbstractBattle) -> int:
         if np.random.random() < prob:
-            return np.random.randint(net.output_size)
-
+            return np.random.randint(net.action_size)
         else:
             encoded_state = embed_battle(battle)
             y = net(encoded_state).item()
@@ -33,14 +37,17 @@ def build_stocastic_policy(net: nn.Module, prob: float = 1.0) -> Callable:
     return policy
 
 
-class OpponentPlayer(Player):
-    #def __init__(self, *args, **kwargs):
-        #super().__init__(OpponentPlayer, *args, **kwargs)
-        #self.policy = build_stocastic_policy(policy)
-        #self.policy = None
-    #def choose_move(self, battle: AbstractBattle) -> BattleOrder:
+class RandomOpponentPlayer(Player):
     def choose_move(self, battle: AbstractBattle):
-        self.policy(battle)
+        return self.create_order(policy(battle))
+    
+    def update_policy(self, net: nn.Module, prob: float = 1.0):
+        self.policy = build_static_policy(net, 1.0)
+
+ 
+class RLOpponentPlayer(Player):
+    def choose_move(self, battle: AbstractBattle):
+        return self.create_order(self.policy(battle))
     
     def update_policy(self, net: nn.Module, prob: float = 1.0):
         self.policy = build_stocastic_policy(net, prob)
@@ -59,7 +66,25 @@ class MaxDamagePlayer(RandomPlayer):
             return self.choose_random_move(battle)
 
 
-class SimpleRLPlayer(Gen7EnvSinglePlayer):
+class RLPlayer(Gen7EnvSinglePlayer):
+    def __init__(
+        self, 
+        fainted_value: float = 0.0,
+        hp_value: float = 0.0,
+        #number_of_pokemons: int = 6,
+        #starting_value: float = 0.0,
+        status_value: float = 0.0,
+        victory_value: float = 1.0,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.fainted_value = fainted_value
+        self.hp_value = hp_value
+        #self.number_of_pokemons = number_of_pokemons
+        #self.starting_value = starting_value
+        self.status_value = status_value
+        self.victory_value = victory_value
+
     @property
     def observation_space(self) -> np.array:
         return spaces.Box(float("-inf"), float("inf"), shape=(108,))
@@ -72,11 +97,16 @@ class SimpleRLPlayer(Gen7EnvSinglePlayer):
         #return spaces.Discrete(self._ACTION_SPACE)
 
     def compute_reward(self, battle: Battle) -> float:
+        return 1
         return self.reward_computing_helper(
             battle,
-            fainted_value=1, # TODO change to 1 could cause 2 poke to sacrifice?
-            hp_value=0,
-            victory_value=29,
+            fainted_value=self.fainted_value,
+            hp_value=self.hp_value,
+            #number_of_pokemons=self.number_of_pokemons,
+            #starting_value=self.starting_value,
+            status_value=self.status_value,
+            victory_value=self.victory_value
         )
+
     def embed_battle(self, battle: AbstractBattle) -> np.ndarray:
-        return utils.embed_battle(battle)
+        return utils.embed.embed_battle(battle)

@@ -28,6 +28,7 @@ def embed_boosts(pokemon: Pokemon) -> np.ndarray:
             pokemon.boosts['accuracy'],
         ]) / 6.
 
+
 def embed_moves(battle: Battle) -> np.ndarray:
     # -1 indicates that the move does not have a base power
     # or is not available
@@ -119,22 +120,3 @@ def embed_battle(battle: Battle) -> np.ndarray:
         [hp, opp_hp], # 2
         [remaining_mon_team, remaining_mon_opponent]] # 2
     ) # 36 + 7 + 12 + 2 = 60
-
-# TODO add issue for swapping auto order for easier embedding
-# TODO running avarage of wins
-# TODO register models
-# TODO add tests on data
-
-# TODO if new model beats old model in 1_000_000 games, move to production
-# TODO hyperparam sweep with reward function changes too
-
-
-# TODO is height used for anything?
-# TODO add weight
-# TODO add height
-
-
-def build_random_policy(n):
-    def policy(battle: Battle):
-        return np.random.randint(n)
-    return policy
