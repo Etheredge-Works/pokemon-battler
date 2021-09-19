@@ -74,7 +74,6 @@ def embed_moves(battle: Battle) -> np.ndarray:
 
     
 def embed_pokemon(pokemon) -> np.ndarray:
-    
     # TODO encode chance of move success? maybe use counter for accuracy of protected moves?
     return np.concatenate([
         #pok
@@ -83,6 +82,7 @@ def embed_pokemon(pokemon) -> np.ndarray:
         np.array([pokemon.protect])
         [pokemon.level / 100.]
     ])
+
 
 def embed_battle(battle: Battle) -> np.ndarray:
     # -1 indicates that the move does not have a base power

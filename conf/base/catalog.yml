@@ -2,3 +2,16 @@
 #
 # Documentation for this file format can be found in "The Data Catalog"
 # Link: https://kedro.readthedocs.io/en/stable/05_data/01_data_catalog.html
+
+dqm_model:
+  type: battler.extras.lightning_model.LightningDataSet
+  filepath: data/06_models/dqm
+  versioned: False
+
+dqn_random_results:
+  type: yaml.YAMLDataSet
+  filepath: data/08_reporting/dqn_random.yml
+
+dqn_max_results:
+  type: yaml.YAMLDataSet
+  filepath: data/08_reporting/dqn_max.yml

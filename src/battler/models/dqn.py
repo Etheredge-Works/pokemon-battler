@@ -35,9 +35,7 @@ class DQN(nn.Module):
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(hidden_size, hidden_size))
             layers.append(nn.ReLU())
-        layers += [
-            nn.Linear(hidden_size, n_actions), 
-        ]
+        layers.append(nn.Linear(hidden_size, n_actions))
 
         # Action values
         self.net = nn.Sequential(*layers)

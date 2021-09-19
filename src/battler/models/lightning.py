@@ -110,7 +110,7 @@ class DQNLightning(pl.LightningModule):
         obs_size = env.observation_space.shape[0]
         n_actions = env.action_space.n
         self.net = DQN(obs_size, n_actions, **self.net_kwargs)
-        self.target_net = DQN(obs_size, n_actions)
+        self.target_net = DQN(obs_size, n_actions, **self.net_kwargs)
 
         self.agent = Agent(env, self.buffer)
         self.opponent = opponent
@@ -118,7 +118,6 @@ class DQNLightning(pl.LightningModule):
         # TODO copy
         self.opponent.update_policy(self.target_net, 1.0)
         self.populate(self.warm_start_steps)
-        print("######### built ######")
 
     def update_opponent(self, opponent):
         self.opponent = opponent

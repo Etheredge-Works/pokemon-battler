@@ -1,19 +1,27 @@
-epochs: 10
-replay_size: 1_000_000
-warm_start_steps: 200_000
-gamma: 0.99
-eps_start: 1.0
-eps_end: 0.05
-eps_last_frame: 1_000_000
-sync_rate: 5_000
-lr: 1e-3
-episode_length: 100_000
-batch_size: 32
-
+epochs: 1
+lightning_kwargs:
+    replay_size: 1_000_000
+    warm_start_steps: 2_000
+    gamma: 0.99
+    eps_start: 1.0
+    eps_end: 0.05
+    eps_last_frame: 1_000_000
+    sync_rate: 5_000
+    lr: 0.0003 
+    episode_length: 1_000
+    batch_size: 32
+checkpoint_path: 'data/06_models/ckpt'
 loss_type: mse
 # TODO inject loss function
 
-opponent_type: random
+train_opponent: random
+obs_space: 108
+
+random_opponent: random
+max_opponent: max_damage
+self_oppoenent: self
+n_battles: 100
+
 battle_format: gen7randombattle
 observation_space: 17
 
@@ -23,7 +31,7 @@ dqn_kwargs:
     #num_heads: 1
 
 reward_kwargs:
-    fainted_value: 1.0
+    fainted_value: 0.0
     hp_value: 0.0
     #number_of_pokemons: 6
     #starting_value: 0.0

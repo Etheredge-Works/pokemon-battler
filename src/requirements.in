@@ -4,7 +4,6 @@ isort~=5.0
 jupyter~=1.0
 jupyter_client>=5.1, <7.0
 jupyterlab~=3.0
-kedro==0.17.4
 kedro-telemetry~=0.1.0
 nbstripout~=0.4
 pytest-cov~=2.5
@@ -16,6 +15,6 @@ tensorflow
 optuna
 gym
 poke-env
-tf-agents
 pillow
 asyncio
+kedro[yaml]

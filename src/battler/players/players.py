@@ -39,7 +39,7 @@ def build_stocastic_policy(net: nn.Module, prob: float = 1.0) -> Callable:
 
 class RandomOpponentPlayer(Player):
     def choose_move(self, battle: AbstractBattle):
-        return self.create_order(policy(battle))
+        return self.create_order(self.policy(battle))
     
     def update_policy(self, net: nn.Module, prob: float = 1.0):
         self.policy = build_static_policy(net, 1.0)
@@ -97,7 +97,7 @@ class RLPlayer(Gen7EnvSinglePlayer):
         #return spaces.Discrete(self._ACTION_SPACE)
 
     def compute_reward(self, battle: Battle) -> float:
-        return 1
+        #return 1
         return self.reward_computing_helper(
             battle,
             fainted_value=self.fainted_value,

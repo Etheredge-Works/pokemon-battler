@@ -6,9 +6,17 @@ services:
       USERNAME: ${USERNAME}
       PASSWORD: ${PASSWORD}
     command: ["python", "src/battler/deploy/random_player.py"]
+
   base-player:
     build: .
     environment: 
       USERNAME: ${USERNAME}
       PASSWORD: ${PASSWORD}
     command: ["python", "src/battler/deploy/base_player.py"]
+
+  dqn-player:
+    build: .
+    environment: 
+      USERNAME: ${USERNAME}
+      PASSWORD: ${PASSWORD}
+    command: ["python", "src/battler/deploy/dqn_player.py"]

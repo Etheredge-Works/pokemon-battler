@@ -40,8 +40,10 @@ def register_pipelines() -> Dict[str, Pipeline]:
     Returns:
         A mapping from a pipeline name to a ``Pipeline`` object.
     """
-    dqn = create_data_pipeline()
+    train, eval = create_data_pipeline()
     return {
-        "dqn": dqn,
-        "__default__": dqn
+        "dqn_train": train,
+        "dqn_eval": eval,
+        "dqn": train+eval,
+        "__default__": train+eval
     }

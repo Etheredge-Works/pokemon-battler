@@ -1,0 +1,1 @@
+# write agent to not take best move, but take best move amoung available moves and *maybe* set other values to 0

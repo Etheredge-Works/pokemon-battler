@@ -1,6 +1,8 @@
 from kedro.pipeline import Pipeline, node
+from pytorch_lightning.core import lightning
 
 from .nodes import (
+    evaluate,
     train
 )
 #from .analysis import exploration
@@ -9,29 +11,48 @@ from .nodes import (
 
 
 def create_data_pipeline(**kwargs):
-    return Pipeline([
+    train_p = Pipeline([
         node(
             train, 
             inputs=dict(
                 battle_format="params:battle_format",
-                opponent_type="params:opponent_type",
+                opponent_type="params:train_opponent",
+                lightning_kwargs="params:lightning_kwargs",
                 epochs="params:epochs",
-                replay_size="params:replay_size",
-                warm_start_steps="params:warm_start_steps",
-                gamma="params:gamma",
-                eps_start="params:eps_start",
-                eps_end="params:eps_end",
-                eps_last_frame="params:eps_last_frame",
-                sync_rate="params:sync_rate",
-                lr="params:lr",
-                episode_length="params:episode_length",
-                batch_size="params:batch_size",
+                model_path="params:checkpoint_path",
                 reward_kwargs="params:reward_kwargs",
                 net_kwargs="params:dqn_kwargs",
             ),
             outputs=dict(
-                model="raw_kddcup99_data",
-                targets="raw_kddcup99_targets"
+                model_path="dqn_model_path",
+                model_state="dqn_model_state"
             ),
         ),
     ])
+    eval_p = Pipeline([
+        node(
+            evaluate,
+            inputs=dict(
+                model_state="dqn_model_state",
+                model_kwargs="params:dqn_kwargs",
+                n_battles="params:n_battles",
+                obs_space="params:obs_space",
+                battle_format="params:battle_format",
+                opponent_type="params:random_opponent",
+            ),
+            outputs='dqn_random_results'
+        ),
+        node(
+            evaluate,
+            inputs=dict(
+                model_state="dqn_model_state",
+                model_kwargs="params:dqn_kwargs",
+                n_battles="params:n_battles",
+                obs_space="params:obs_space",
+                battle_format="params:battle_format",
+                opponent_type="params:max_opponent",
+            ),
+            outputs='dqn_max_results'
+        ),
+    ])
+    return train_p, eval_p

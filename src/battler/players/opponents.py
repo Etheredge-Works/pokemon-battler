@@ -17,7 +17,7 @@ def build_static_policy(net: nn.Module, prob: float) -> Callable:
         if np.random.random() < prob:
             return np.random.randint(net.action_size)
         else:
-            encoded_state = embed.embed_battle(battle)
+            encoded_state = torch.from_numpy(embed.embed_battle(battle))
             return net(encoded_state).argmax().item()
     return policy
 
@@ -29,16 +29,23 @@ def build_stocastic_policy(net: nn.Module, prob: float = 1.0) -> Callable:
             # TODO self.choos_random_move(battle)?
         else:
             encoded_state = embed.embed_battle(battle)
-            y = net(encoded_state).item()
-            probabilities = F.softmax(y)
+            y = net(torch.from_numpy(encoded_state))
+            probabilities = F.softmax(y, dim=0)
             return torch.multinomial(probabilities, 1).item()
+    return policy
+
+def build_eval_stocastic_policy(net: nn.Module) -> Callable:
+    def policy(battle: AbstractBattle) -> int:
+        encoded_state = embed.embed_battle(battle)
+        y = net(torch.from_numpy(encoded_state))
+        probabilities = F.softmax(y, dim=0)
+        return torch.multinomial(probabilities, 1).item()
     return policy
 
 
 class RandomOpponentPlayer(RandomPlayer):
     def update_policy(self, net: nn.Module, _: float = 1.0):
         pass
-
 
  
 class RLOpponentPlayer(Player):
@@ -65,4 +72,7 @@ class MaxDamagePlayer(RandomPlayer):
         # If no attack is available, a random switch will be made
         else:
             return self.choose_random_move(battle)
+
+    def update_policy(self, net: nn.Module, _: float = 1.0):
+        pass
 

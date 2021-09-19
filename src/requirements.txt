@@ -8,7 +8,6 @@ absl-py==0.13.0
     # via
     #   tensorboard
     #   tensorflow
-    #   tf-agents
 alembic==1.7.1
     # via optuna
 anyconfig==0.10.1
@@ -68,10 +67,7 @@ click==7.1.2
 cliff==3.9.0
     # via optuna
 cloudpickle==1.6.0
-    # via
-    #   gym
-    #   tensorflow-probability
-    #   tf-agents
+    # via gym
 cmaes==0.8.2
     # via optuna
 cmd2==2.2.0
@@ -87,14 +83,10 @@ coverage==5.5
 debugpy==1.4.3
     # via ipykernel
 decorator==5.1.0
-    # via
-    #   ipython
-    #   tensorflow-probability
+    # via ipython
 defusedxml==0.7.1
     # via nbconvert
-dm-tree==0.1.6
-    # via tensorflow-probability
-dynaconf==3.1.7
+dynaconf==3.1.5
     # via kedro
 entrypoints==0.3
     # via
@@ -104,14 +96,10 @@ flake8==3.9.2
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 flatbuffers==1.12
     # via tensorflow
-fsspec==0.8.7
+fsspec==2021.8.1
     # via kedro
 gast==0.4.0
-    # via
-    #   tensorflow
-    #   tensorflow-probability
-gin-config==0.4.0
-    # via tf-agents
+    # via tensorflow
 gitdb==4.0.7
     # via gitpython
 gitpython==3.1.18
@@ -134,7 +122,6 @@ gym==0.19.0
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
     #   poke-env
-    #   tf-agents
 h5py==3.1.0
     # via tensorflow
 idna==2.10
@@ -229,7 +216,7 @@ jupyterlab==3.1.12
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 kedro-telemetry==0.1.2
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
-kedro==0.17.4
+kedro==0.17.5
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
     #   kedro-telemetry
@@ -293,8 +280,6 @@ numpy==1.19.5
     #   scipy
     #   tensorboard
     #   tensorflow
-    #   tensorflow-probability
-    #   tf-agents
 oauthlib==3.1.1
     # via requests-oauthlib
 opt-einsum==3.3.0
@@ -350,7 +335,6 @@ protobuf==3.17.3
     # via
     #   tensorboard
     #   tensorflow
-    #   tf-agents
 ptyprocess==0.7.0
     # via
     #   pexpect
@@ -434,6 +418,8 @@ requests==2.25.1
     #   requests-oauthlib
     #   requests-unixsocket
     #   tensorboard
+rope==0.19.0
+    # via kedro
 rsa==4.7.2
     # via google-auth
 scipy==1.7.1
@@ -448,7 +434,6 @@ six==1.15.0
     #   astunparse
     #   bleach
     #   cookiecutter
-    #   dm-tree
     #   google-auth
     #   google-pasta
     #   grpcio
@@ -457,8 +442,6 @@ six==1.15.0
     #   protobuf
     #   python-dateutil
     #   tensorflow
-    #   tensorflow-probability
-    #   tf-agents
 smmap==4.0.0
     # via gitdb
 sniffio==1.2.0
@@ -479,8 +462,6 @@ tensorboard==2.6.0
     # via tensorflow
 tensorflow-estimator==2.6.0
     # via tensorflow
-tensorflow-probability==0.13.0
-    # via tf-agents
 tensorflow==2.6.0
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 termcolor==1.1.0
@@ -493,8 +474,6 @@ testpath==0.5.0
     # via nbconvert
 text-unidecode==1.3
     # via python-slugify
-tf-agents==0.9.0
-    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 toml==0.10.2
     # via
     #   black
@@ -528,9 +507,7 @@ traitlets==5.1.0
     #   notebook
     #   qtconsole
 typing-extensions==3.7.4.3
-    # via
-    #   tensorflow
-    #   tf-agents
+    # via tensorflow
 urllib3==1.26.6
     # via
     #   requests
@@ -557,9 +534,7 @@ wheel==0.36.2
 widgetsnbextension==3.5.1
     # via ipywidgets
 wrapt==1.12.1
-    # via
-    #   tensorflow
-    #   tf-agents
+    # via tensorflow
 zipp==3.5.0
     # via importlib-resources
 
