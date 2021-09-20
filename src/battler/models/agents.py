@@ -50,7 +50,7 @@ class Agent:
             # TODO apply softmax probabilities here
             q_values = net(state)
             #_, action = torch.max(q_values, dim=1)
-            probabilities = F.softmax(q_values, dim=1)
+            probabilities = F.softmax(q_values, dim=1) # 2d shape
             action = int(torch.multinomial(probabilities, 1).item())
 
             #action = int(action.item())
