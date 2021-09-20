@@ -154,7 +154,7 @@ def evaluate(
     #model = DQNLightning(**model_kwargs)
     #model.load_from_checkpoint(model_path)
     if battle_format == "gen7randombattle":
-        action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE) -1
+        action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE) - 1 # TODO why -1?
         #action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE)
     
     model = DQN(
@@ -181,6 +181,7 @@ def evaluate(
         losses=player.n_lost_battles,
         win_rate=player.win_rate,
     )
+    print(results)
     return results
 
 
@@ -197,3 +198,5 @@ def evaluate(
         #model=model,
         #trainer=trainer,
     #)
+# TODO use RL player instead of other kinds. can pull out action/obs space
+# TODO is iterator frozen? or does it get new steps?

@@ -29,6 +29,7 @@ def create_data_pipeline(**kwargs):
             ),
         ),
     ])
+    # TODO print summary of net and training
     eval_p = Pipeline([
         node(
             evaluate,
