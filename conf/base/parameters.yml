@@ -1,12 +1,12 @@
-epochs: 1
+epochs: 10
 lightning_kwargs:
     replay_size: 1_000_000
     warm_start_steps: 2_000
     gamma: 0.99
     eps_start: 1.0
     eps_end: 0.05
-    eps_last_frame: 1_000_000
-    sync_rate: 5_000
+    eps_last_frame: 100_000
+    sync_rate: 1_000
     lr: 0.0003 
     episode_length: 1_000
     batch_size: 32
@@ -15,19 +15,19 @@ loss_type: mse
 # TODO inject loss function
 
 train_opponent: random
-obs_space: 108
+obs_space: 136
 
 random_opponent: random
 max_opponent: max_damage
-self_oppoenent: self
-n_battles: 100
+self_opponent: self
+n_battles: 200
 
 battle_format: gen7randombattle
-observation_space: 17
+observation_space: 108
 
 dqn_kwargs:
-    hidden_size: 128
-    num_layers: 2
+    hidden_size: 512
+    num_layers: 3
     #num_heads: 1
 
 reward_kwargs:
