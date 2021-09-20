@@ -1,4 +1,5 @@
 from torch import nn
+from battler.utils.pokemon_embed import PokemonEmbed, MoveEmbed
 
 
 class DQN(nn.Module):
@@ -11,10 +12,11 @@ class DQN(nn.Module):
 
     def __init__(
         self, 
-        obs_size: int, 
-        n_actions: int, 
+        obs_size: int = 1, 
+        n_actions: int = 1, 
         hidden_size: int = 512,
-        num_layers: int = 2
+        num_layers: int = 2,
+
     ):
         """
         Args:

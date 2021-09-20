@@ -48,5 +48,7 @@ class DQNPlayer(Player):
             return self.create_order(battle.available_switches[action - 12])
         else:
             return self.choose_random_move(battle)
+
+
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main(DQNPlayer))

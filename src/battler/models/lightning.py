@@ -185,6 +185,7 @@ class DQNLightning(pl.LightningModule):
 
         return F.smooth_l1_loss(state_action_values, expected_state_action_values)
     
+    '''
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Calculates the validation loss using a mini batch from the replay buffer.
         Args:
@@ -204,6 +205,7 @@ class DQNLightning(pl.LightningModule):
         return {
             "val_loss": nn.MSELoss()(state_action_values, expected_state_action_values),
         }
+    '''
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
         """Carries out a single step through the environment to update the replay buffer. Then calculates loss
