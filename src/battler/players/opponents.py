@@ -16,28 +16,30 @@ def build_static_policy(net: nn.Module, prob: float) -> Callable:
         if np.random.random() < prob:
             return np.random.randint(net.action_size)
         else:
-            encoded_state = torch.from_numpy(embed.embed_battle(battle))
+            encoded_state = torch.Tensor([embed.embed_battle(battle)])
             return net(encoded_state).argmax().item()
     return policy
 
 
-def build_stocastic_policy(net: nn.Module, prob: float = 1.0) -> Callable:
+
+def build_stocastic_policy(net: nn.Module, stack_length: int, prob: float = 1.0) -> Callable:
+    
     def policy(battle: AbstractBattle) -> int:
         if np.random.random() < prob:
             return np.random.randint(net.action_size)
             # TODO self.choos_random_move(battle)?
         else:
             encoded_state = embed.embed_battle(battle)
-            y = net(torch.from_numpy(encoded_state))
-            probabilities = F.softmax(y, dim=0)
+            y = net(torch.Tensor([encoded_state]))
+            probabilities = F.softmax(y, dim=1)
             return torch.multinomial(probabilities, 1).item()
     return policy
 
 def build_eval_stocastic_policy(net: nn.Module) -> Callable:
     def policy(battle: AbstractBattle) -> int:
         encoded_state = embed.embed_battle(battle)
-        y = net(torch.from_numpy(encoded_state))
-        probabilities = F.softmax(y, dim=0)
+        y = net(torch.Tensor([encoded_state]))
+        probabilities = F.softmax(y, dim=1)
         return torch.multinomial(probabilities, 1).item()
     return policy
 

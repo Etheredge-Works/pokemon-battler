@@ -13,7 +13,9 @@ class DQN(nn.Module):
     def __init__(
         self, 
         obs_size: int = 1, 
+        stack_size: int = 1,
         n_actions: int = 1, 
+        out_channels: int = 1,
         hidden_size: int = 512,
         num_layers: int = 2,
 
@@ -24,12 +26,34 @@ class DQN(nn.Module):
             n_actions: number of discrete actions available in the environment
             hidden_size: size of hidden layers
         """
+        super().__init__()
 
         self.action_size = n_actions
-        super().__init__()
-        print(obs_size)
-        layers = [
-            nn.Linear(obs_size, hidden_size), 
+
+        #layers += [
+            # 4 x 184 -> 184
+            #nn.Conv1d(stack_size, 1, kernel_size=obs_size),
+            #nn.ReLU(),
+            #nn.Flatten(),
+        #]
+
+        print(f"obs_size: {obs_size}")
+        print(f"stack_size: {stack_size}")
+        print(f"n_actions: {n_actions}")
+        #self.conv = nn.Conv1d(obs_size, 1, kernel_size=stack_size)
+        # TODO could just remember n dims are this value or that values
+
+        layers = []
+        layers += [
+            #self.conv
+            # [batch_size, stack_size, obs_size]
+            nn.Conv1d(stack_size, out_channels, kernel_size=1),
+            nn.Flatten(),
+        ]
+
+        layers += [
+            nn.Linear(obs_size*out_channels, hidden_size), 
+            #nn.Linear(obs_size*stack_size, hidden_size), 
             nn.ReLU(), 
         ]
 
@@ -43,4 +67,9 @@ class DQN(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
+        #pls = self.conv(x)
+        #print(f"post_conv: {pls.shape}")
+        #x = nn.functional.flatten(x, dim=1)
+        #print(f"x size: {x.size()}")
+
         return self.net(x.float())

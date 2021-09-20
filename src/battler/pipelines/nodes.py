@@ -1,3 +1,4 @@
+from collections import deque
 from poke_env.player.random_player import RandomPlayer
 from pytorch_lightning.accelerators import accelerator
 from typing import Dict, Tuple
@@ -27,29 +28,13 @@ def dqn_training(env, model: pl.LightningModule, trainer: pl.Trainer, opponent):
     env.complete_current_battle()
 
 
-
 def train(
     battle_format: str,
     opponent_type: str, 
-    #opponent_name: str, 
-    #opponent_id: int, 
-    #model_type: str, model_name: str, model_id: int,
     lightning_kwargs: Dict,
     epochs: int,
-    #replay_size: int,
-    #warm_start_steps: int,
-    #gamma: float,
-    #eps_start: float,
-    #eps_end: float,
-    #eps_last_frame: int,
-    #sync_rate: int,
-    #lr: float,
-    #episode_length: int,
-    #batch_size: int,
     reward_kwargs: Dict,
     net_kwargs: Dict,
-    #hidden_size: int,
-    #learning_rate: float,
     model_path: str,
 ) -> Dict:
 
@@ -83,21 +68,12 @@ def train(
 
     # Return the model
     return dict(
-        #model=model,
         model_state=model.net.state_dict(),
         model_path=model_path
     )
 
 
-def get_opponent(opponent_type: str):
-    if opponent_type == 'random':
-        return RandomOpponentPlayer
-    elif opponent_type == 'self':
-        return RLOpponentPlayer
-    elif opponent_type == 'max_damage':
-        return MaxDamagePlayer
-    else:
-        raise ValueError('Unknown opponent type: {}'.format(opponent_type))
+from battler.utils import get_opponent
 
 def dqn_evaluation(player, model_kwargs, model_state, nb_episodes=1000):
     # Reset battle statistics
@@ -114,18 +90,17 @@ def dqn_evaluation(player, model_kwargs, model_state, nb_episodes=1000):
     print("Evaluating model")
     for _ in range(nb_episodes):
         # Reset the environment
-        state = player.reset()
+        single_state = player.reset()
+        state = deque([single_state for _ in range(model_kwargs['stack_size'])], maxlen=model_kwargs['stack_size'])
         done = False
         while not done:
             tensor_state = torch.tensor(state, dtype=torch.float32)
             y = model(tensor_state).item()
             probabilities = F.softmax(y)
             action = torch.multinomial(probabilities, 1).item()
-            #values = model.forward(tensor_state)
-            #action = values.argmax()
 
-            #action = values.argmax()
-            state, reward, done, _ = player.step(action)
+            single_state, reward, done, _ = player.step(action)
+            state.append(single_state)
 
     print(
         "DQN Evaluation: %d victories out of %d episodes"
@@ -139,8 +114,31 @@ async def pit_players(players, n_challenges=20):
     cross_evaluation = await cross_evaluate(players, n_challenges=20)
     return cross_evaluation
 
+def evaluate_net(
+    model,
+    stack_size,
+    battle_format,
+    opponent_type,
+    n_battles,
+):
+    player = DQNPlayer(battle_format=battle_format, net=model, stack_size=stack_size, max_concurrent_battles=0)
+    opponent = get_opponent(opponent_type)(battle_format=battle_format, max_concurrent_battles=0)
+
+    asyncio.get_event_loop().run_until_complete(
+        player.battle_against(opponent, n_battles=n_battles))
+
+    results = dict(
+        opponent_type=opponent_type,
+        wins=player.n_won_battles,
+        finished=player.n_finished_battles,
+        ties=player.n_tied_battles,
+        losses=player.n_lost_battles,
+        win_rate=player.win_rate,
+    )
+    return results
 
 import asyncio
+
 def evaluate(
     model_state,
     model_kwargs: Dict,
@@ -162,41 +160,9 @@ def evaluate(
         n_actions=action_space,
         **model_kwargs)
     model.load_state_dict(model_state)
-    player = DQNPlayer(battle_format=battle_format, net=model)
-    #player = get_opponent(opponent_type)(battle_format=battle_format)
-    opponent = get_opponent(opponent_type)(battle_format=battle_format)
-    #results = pit_players(players=[player, opponent], n_challenges=20)
-    #results = await cross_evaluate(players=[player, opponent], n_challenges=20))
-    #results = asyncio.get_event_loop().run_until_complete(
-        #cross_evaluate([player, opponent], n_challenges=20))
-    
-    asyncio.get_event_loop().run_until_complete(
-        player.battle_against(opponent, n_battles=n_battles))
-
-    results = dict(
-        opponent_type=opponent_type,
-        wins=player.n_won_battles,
-        finished=player.n_finished_battles,
-        ties=player.n_tied_battles,
-        losses=player.n_lost_battles,
-        win_rate=player.win_rate,
-    )
+    results = evaluate_net(model, model_kwargs['stack_size'], battle_format, opponent_type, n_battles)
     print(results)
     return results
 
-
-    #env_player = RLPlayer(battle_format=battle_format)
-    #env_player.play_against(
-        #env_algorithm=dqn_evaluation,
-        #opponent=opponent,
-        #env_algorithm_kwargs=dict(
-            #model_state=model_state,
-            #model_kwargs=model_kwargs,
-        #)
-    #)
-    #return dict(
-        #model=model,
-        #trainer=trainer,
-    #)
 # TODO use RL player instead of other kinds. can pull out action/obs space
 # TODO is iterator frozen? or does it get new steps?

@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 
 from poke_env.player.random_player import RandomPlayer
 from poke_env.player.player import Player
@@ -8,16 +9,35 @@ from poke_env.server_configuration import ShowdownServerConfiguration
 from battler.deploy.showdown import main
 from battler.players.opponents import build_eval_stocastic_policy
 import torch.nn.functional as F
+from battler.utils.embed import embed_battle
+import torch
+from poke_env.environment.battle import AbstractBattle
 
 
 class DQNPlayer(Player):
-    def __init__(self, *args, net, **kwargs):
+    def __init__(self, *args, net, stack_size, **kwargs):
         super().__init__(*args, **kwargs)
         net.eval()
-        self.policy = build_eval_stocastic_policy(net)
+        self.state = None
+        self.stack_size = stack_size
+        #self.policy = build_eval_stocastic_policy(net)
+        self.net = net
+
+    def _battle_finished_callback(self, battle: AbstractBattle) -> None:
+        self.stack = None
 
     def choose_move(self, battle):
-        action = self.policy(battle)
+        encoded_state = embed_battle(battle)
+        if self.state is None:
+            self.state = deque([encoded_state for _ in range(self.stack_size)], maxlen=self.stack_size)
+        else:
+            self.state.append(encoded_state)
+
+        tensor_state = torch.Tensor([self.state])
+        y = self.net(tensor_state)
+        probabilities = F.softmax(y, dim=1)
+        action = torch.multinomial(probabilities, 1).item()
+
         return self._action_to_move(action, battle)
 
     def _action_to_move(self, action, battle):

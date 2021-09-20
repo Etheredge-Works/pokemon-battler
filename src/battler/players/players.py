@@ -69,6 +69,7 @@ class MaxDamagePlayer(RandomPlayer):
 class RLPlayer(Gen7EnvSinglePlayer):
     def __init__(
         self, 
+        obs_space: int,
         fainted_value: float = 0.0,
         hp_value: float = 0.0,
         #number_of_pokemons: int = 6,
@@ -78,6 +79,7 @@ class RLPlayer(Gen7EnvSinglePlayer):
         **kwargs,
     ):
         super().__init__(**kwargs)
+        self.obs_space = obs_space
         self.fainted_value = fainted_value
         self.hp_value = hp_value
         #self.number_of_pokemons = number_of_pokemons
@@ -87,7 +89,7 @@ class RLPlayer(Gen7EnvSinglePlayer):
 
     @property
     def observation_space(self) -> np.array:
-        return spaces.Box(float("-inf"), float("inf"), shape=(136,))
+        return spaces.Box(float("-inf"), float("inf"), shape=(self.obs_space,))
 
     @property
     def action_space(self) -> List:

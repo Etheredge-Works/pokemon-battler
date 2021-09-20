@@ -32,6 +32,7 @@ def embed_boosts(pokemon: Pokemon) -> np.ndarray:
 def embed_moves(battle: Battle) -> np.ndarray:
     # -1 indicates that the move does not have a base power
     # or is not available
+    # TODO move to embed pokemon
     moves_base_power = -np.ones(4)
     moves_dmg_multiplier = np.ones(4)
     moves_acc = np.ones(4)
@@ -45,14 +46,19 @@ def embed_moves(battle: Battle) -> np.ndarray:
             )
         moves_acc[i] = move.accuracy
 
+        '''
         moves_other[i] = np.array([
             # bools
-            move.breaks_protect,
-            move.heal,
+            int(move.breaks_protect),
+            int(move.heal),
             int(move.is_protect_counter),
             int(move.is_protect_move),
             #move.is_recharge, not gen 7
             int(move.force_switch),
+            int(move.ignore_ability),
+            int(move.ignore_evasion),
+            int(move.thaws_target),
+            int(move.stalling_move),
 
             # precent
             move.recoil,
@@ -60,14 +66,8 @@ def embed_moves(battle: Battle) -> np.ndarray:
             move.current_pp / 50.,
             #move.damage,
             move.drain,
-            int(move.ignore_ability),
-            int(move.ignore_evasion),
             #int(move.ignore_immunity),
             move.max_pp / 50.,
-            move.stalling_move,
-            int(move.thaws_target),
-
-
 
             # ints
             move.priority,
@@ -76,21 +76,26 @@ def embed_moves(battle: Battle) -> np.ndarray:
             #move.expected_hits,
             #move.self_boosts,
         ])
+        '''
     return np.concatenate([
         moves_base_power, 
         moves_dmg_multiplier, 
         moves_acc,
-        moves_other.flatten(),
+        #moves_other.flatten(),
         ])
 
     
+def embed_opponent_pokemons(battle: Battle) -> np.ndarray:
+    pass
+
+
 def embed_pokemon(pokemon: Pokemon) -> np.ndarray:
     # TODO encode chance of move success? maybe use counter for accuracy of protected moves?
     return np.concatenate([
         #pok
         embed_stats(pokemon),
         embed_boosts(pokemon),
-        np.array([pokemon.protect]),
+        #np.array([pokemon.protect]),
         np.array([
             float(pokemon.active),
             float(pokemon.current_hp / 250.),
@@ -98,7 +103,7 @@ def embed_pokemon(pokemon: Pokemon) -> np.ndarray:
             float(pokemon.fainted),
             float(pokemon.first_turn),
             float(pokemon.must_recharge),
-            float(pokemon.preparing),
+            #float(pokemon.preparing), TODO why tuple?
             float(pokemon.revealed),
             float(pokemon.weight),
             pokemon.level / 100.
@@ -114,11 +119,13 @@ def embed_battle(battle: Battle) -> np.ndarray:
     # TODO : Add more embedding
     # TODO: gender 
 
-    stats = [embed_stats(mon)for mon in battle.team.values()]
-    stats = np.concatenate(stats)
+    #stats = [embed_stats(mon)for mon in battle.team.values()]
+    #stats = np.concatenate(stats)
 
-    boosts = embed_boosts(battle.active_pokemon)
-    opp_boosts = embed_boosts(battle.opponent_active_pokemon)
+    #boosts = embed_boosts(battle.active_pokemon)
+    #opp_boosts = embed_boosts(battle.opponent_active_pokemon)
+    #mons_emb = np.concatenate([embed_pokemon(mon) for mon in battle.team.values()])
+    #opp_mons_emb = np.concatenate([embed_pokemon(mon) for mon in battle.opponent_team.values()])
 
     hp = battle.active_pokemon.current_hp_fraction
     opp_hp = battle.opponent_active_pokemon.current_hp_fraction
@@ -129,16 +136,19 @@ def embed_battle(battle: Battle) -> np.ndarray:
         len([mon for mon in battle.opponent_team.values() if mon.fainted]) / 6
     )
 
-    levels = np.array([mon.level for mon in battle.team.values()]) / 100.
+    #levels = np.array([mon.level for mon in battle.team.values()]) / 100.
     #opp_levels = [mon.level for mon in battle.active_pokemon]
 
     # Final vector with N components
     return np.concatenate([
-        stats, # 6 * 6 = 36
-        boosts, # 7
-        opp_boosts, # 7
-        levels, # 6
+        #stats, # 6 * 6 = 36
+        #boosts, # 7
+        #opp_boosts, # 7
+        #levels, # 6
         moves_vector, # 12
-        [hp, opp_hp], # 2
-        [remaining_mon_team, remaining_mon_opponent]] # 2
-    ) # 36 + 7 + 12 + 2 = 60
+        #mons_emb,
+        #opp_mons_emb,
+        [hp, opp_hp, remaining_mon_team, remaining_mon_opponent],
+        #[hp, opp_hp], # 2
+        #[remaining_mon_team, remaining_mon_opponent]] # 2
+    ]) # 36 + 7 + 12 + 2 = 60

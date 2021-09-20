@@ -3,3 +3,9 @@
 # TODO
 - make sure raw stats (stats + base + levels + ivs + evs + nature) are used
 
+- could it be better to just clone and store battles?
+- explore reward shaping
+- Break out embeddings into separate values for encoding
+- fix npbool_ error, likely from embeddings
+- add logging to deployed agents
+- increase n_battles deployed agents

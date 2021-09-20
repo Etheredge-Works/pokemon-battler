@@ -20,7 +20,7 @@ def create_data_pipeline(**kwargs):
                 lightning_kwargs="params:lightning_kwargs",
                 epochs="params:epochs",
                 model_path="params:checkpoint_path",
-                reward_kwargs="params:reward_kwargs",
+                reward_kwargs="params:rl_player_kwargs",
                 net_kwargs="params:dqn_kwargs",
             ),
             outputs=dict(

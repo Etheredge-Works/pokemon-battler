@@ -33,6 +33,7 @@ from typing import List, Tuple, Dict
 import gym
 import numpy as np
 from numpy.core.numeric import ones
+from numpy.core.shape_base import stack
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -48,6 +49,9 @@ from ..data.datasets import ReplayBuffer, RLDataset
 from ..data.buffers import Experience
 from ..models.dqn import DQN
 from .agents import Agent
+from battler.utils.other import get_opponent
+from battler.deploy.dqn_player import DQNPlayer
+import asyncio
 
 
 class DQNLightning(pl.LightningModule):
@@ -75,8 +79,10 @@ class DQNLightning(pl.LightningModule):
         sync_rate: int = 5_000,
         lr: float = 1e-3,
         episode_length: int = 100_000,
-        batch_size: int = 32,
+        stack_length: int = 2,
+        batch_size: int = 4,
         net_kwargs: Dict = None,
+        battle_format: str = 'gen7randombattle',
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -90,6 +96,10 @@ class DQNLightning(pl.LightningModule):
         self.lr = lr
         self.episode_length = episode_length
         self.batch_size = batch_size
+        self.stack_size = stack_length
+        self.battle_format = battle_format
+        self.loop = asyncio.new_event_loop()
+        #asyncio.set_event_loop(self.loop)
 
         #self.env = gym.make(env)
         #self.env = env
@@ -109,10 +119,12 @@ class DQNLightning(pl.LightningModule):
     def build(self, env, opponent, val_env=None, val_opponent=None):
         obs_size = env.observation_space.shape[0]
         n_actions = env.action_space.n
-        self.net = DQN(obs_size, n_actions, **self.net_kwargs)
-        self.target_net = DQN(obs_size, n_actions, **self.net_kwargs)
+        self.net = DQN(obs_size=obs_size, n_actions=n_actions, **self.net_kwargs)
+        #from torchsummary import summary
+        #summary(self.net.to('cuda'), (obs_size, self.stack_length)) 
+        self.target_net = DQN(obs_size=obs_size, n_actions=n_actions, **self.net_kwargs)
 
-        self.agent = Agent(env, self.buffer)
+        self.agent = Agent(env, self.buffer, stack_length=self.stack_size)
         self.opponent = opponent
         #self.opponent.policy = utils.build_random_policy(n_actions)
         # TODO copy
@@ -149,6 +161,7 @@ class DQNLightning(pl.LightningModule):
             loss
         """
         states, actions, rewards, dones, next_states = batch
+        #print(states.size())
 
         state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
         #target_state_action_values = self.target_net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
@@ -185,27 +198,33 @@ class DQNLightning(pl.LightningModule):
 
         return F.smooth_l1_loss(state_action_values, expected_state_action_values)
     
-    '''
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Calculates the validation loss using a mini batch from the replay buffer.
-        Args:
-            batch: current mini batch of replay data
-        Returns:
-            loss
-        """
-        states, actions, rewards, dones, next_states = batch
+    # TODO battle format
+    def training_epoch_end(self, outputs) -> None:
+        avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
+        player = DQNPlayer(
+            battle_format=self.battle_format, 
+            net=self.net, 
+            stack_size=self.stack_size,
+            max_concurrent_battles=0)
+        for opponent_type in ['random', 'max_damage']:
+            opponent = get_opponent(opponent_type)(battle_format=self.battle_format, max_concurrent_battles=0)
+        
+            #player.battle_against(opponent, n_battles=self.n_battles)
+            #asyncio.get_event_loop().run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
+            self.loop.run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
 
-        state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-        next_state_values = self.target_net(next_states).max(1)[0]
-        next_state_values[dones] = 0.0
-        next_state_values = next_state_values.detach()
+            results = dict(
+                avg_loss=avg_loss.item(),
+                opponent_type=opponent_type,
+                wins=player.n_won_battles,
+                finished=player.n_finished_battles,
+                ties=player.n_tied_battles,
+                losses=player.n_lost_battles,
+                win_rate=player.win_rate,
+            )
+            print(results)
 
-        expected_state_action_values = next_state_values * self.gamma + rewards
 
-        return {
-            "val_loss": nn.MSELoss()(state_action_values, expected_state_action_values),
-        }
-    '''
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
         """Carries out a single step through the environment to update the replay buffer. Then calculates loss
@@ -239,6 +258,9 @@ class DQNLightning(pl.LightningModule):
             "total_reward": torch.tensor(self.total_reward).to(device),
             "reward": torch.tensor(reward).to(device),
             "steps": torch.tensor(self.global_step).to(device),
+            "epsilon": torch.tensor(epsilon).to(device),
+            #"win_rate": torch.tensor(self.agent.log()['win_rate']).to(device),
+            **self.agent.log(),
         }
 
         return OrderedDict({"loss": loss, "log": log, "progress_bar": log})
@@ -262,17 +284,6 @@ class DQNLightning(pl.LightningModule):
     def train_dataloader(self) -> DataLoader:
         """Get train loader."""
         return self.__dataloader()
-
-    def test_dataloader(self) -> DataLoader:
-        """Get validation loader."""
-        dataset = RLDataset(self.buffer, self.episode_length)
-        dataloader = DataLoader(dataset=dataset, batch_size=self.batch_size, sampler=None)
-        return dataloader
-        return self.__dataloader()
-
-    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
-        """Validation step."""
-        return self.training_step(batch, nb_batch)
 
     def get_device(self, batch) -> str:
         """Retrieve device currently being used by minibatch."""
