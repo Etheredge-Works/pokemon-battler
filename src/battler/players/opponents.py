@@ -11,7 +11,6 @@ from poke_env.player.random_player import RandomPlayer
 from battler.utils import embed
 
 
-
 def build_static_policy(net: nn.Module, prob: float) -> Callable:
     def policy(battle: AbstractBattle) -> int:
         if np.random.random() < prob:

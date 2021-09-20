@@ -35,7 +35,7 @@ def embed_moves(battle: Battle) -> np.ndarray:
     moves_base_power = -np.ones(4)
     moves_dmg_multiplier = np.ones(4)
     moves_acc = np.ones(4)
-    moves_other = np.zeros((4, 9))
+    moves_other = np.zeros((4, 16))
     for i, move in enumerate(battle.available_moves):
         moves_base_power[i] = move.base_power / 100
         if move.type:
@@ -49,14 +49,25 @@ def embed_moves(battle: Battle) -> np.ndarray:
             # bools
             move.breaks_protect,
             move.heal,
-            move.is_protect_counter,
-            move.is_protect_move,
+            int(move.is_protect_counter),
+            int(move.is_protect_move),
             #move.is_recharge, not gen 7
-            move.force_switch,
+            int(move.force_switch),
 
             # precent
             move.recoil,
             move.crit_ratio,
+            move.current_pp / 50.,
+            #move.damage,
+            move.drain,
+            int(move.ignore_ability),
+            int(move.ignore_evasion),
+            #int(move.ignore_immunity),
+            move.max_pp / 50.,
+            move.stalling_move,
+            int(move.thaws_target),
+
+
 
             # ints
             move.priority,
@@ -73,14 +84,25 @@ def embed_moves(battle: Battle) -> np.ndarray:
         ])
 
     
-def embed_pokemon(pokemon) -> np.ndarray:
+def embed_pokemon(pokemon: Pokemon) -> np.ndarray:
     # TODO encode chance of move success? maybe use counter for accuracy of protected moves?
     return np.concatenate([
         #pok
         embed_stats(pokemon),
         embed_boosts(pokemon),
-        np.array([pokemon.protect])
-        [pokemon.level / 100.]
+        np.array([pokemon.protect]),
+        np.array([
+            float(pokemon.active),
+            float(pokemon.current_hp / 250.),
+            float(pokemon.current_hp_fraction),
+            float(pokemon.fainted),
+            float(pokemon.first_turn),
+            float(pokemon.must_recharge),
+            float(pokemon.preparing),
+            float(pokemon.revealed),
+            float(pokemon.weight),
+            pokemon.level / 100.
+        ])
     ])
 
 

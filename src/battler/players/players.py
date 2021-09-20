@@ -87,7 +87,7 @@ class RLPlayer(Gen7EnvSinglePlayer):
 
     @property
     def observation_space(self) -> np.array:
-        return spaces.Box(float("-inf"), float("inf"), shape=(108,))
+        return spaces.Box(float("-inf"), float("inf"), shape=(136,))
 
     @property
     def action_space(self) -> List:
@@ -97,7 +97,6 @@ class RLPlayer(Gen7EnvSinglePlayer):
         #return spaces.Discrete(self._ACTION_SPACE)
 
     def compute_reward(self, battle: Battle) -> float:
-        #return 1
         return self.reward_computing_helper(
             battle,
             fainted_value=self.fainted_value,
