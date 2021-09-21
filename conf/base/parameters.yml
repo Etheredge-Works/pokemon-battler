@@ -1,14 +1,14 @@
 epochs: 100
 lightning_kwargs:
     replay_size: 100_000
-    warm_start_steps: 10_000
+    warm_start_steps: 100_000
     gamma: 0.99
     eps_start: 1.0
     eps_end: 0.05
-    eps_last_frame: 300_000
-    sync_rate: 100
+    eps_last_frame: 100_000  
+    sync_rate: 1000
     lr: 0.0003 
-    episode_length: 10_000
+    episode_length: 100_000  # num / batch_size
     batch_size: 32
     stack_length: 8
 checkpoint_path: 'data/06_models/ckpt'
@@ -27,9 +27,10 @@ battle_format: gen7randombattle
 observation_space: 108
 
 dqn_kwargs:
-    hidden_size: 128
+    hidden_size: 256
+    stack_size: 32
     num_layers: 2
-    stack_size: 8
+    out_channels: 4
     #num_heads: 1
 
 rl_player_kwargs:

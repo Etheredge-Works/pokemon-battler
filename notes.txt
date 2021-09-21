@@ -9,3 +9,6 @@
 - fix npbool_ error, likely from embeddings
 - add logging to deployed agents
 - increase n_battles deployed agents
+
+- increase n for log flushing
+- https://pytorch-lightning.readthedocs.io/en/stable/extensions/logging.html#:~:text=you%20want%20to%20track,metrics%20tracking%20within%20LightningModule.
