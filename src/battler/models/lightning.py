@@ -27,6 +27,7 @@ Second-Edition/blob/master/Chapter06/02_dqn_pong.py
 """
 
 import argparse
+from copy import deepcopy
 from collections import namedtuple, OrderedDict
 from typing import List, Tuple, Dict
 
@@ -34,6 +35,7 @@ import gym
 import numpy as np
 from numpy.core.numeric import ones
 from numpy.core.shape_base import stack
+from poke_env.player.random_player import RandomPlayer
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -44,6 +46,8 @@ import torch.nn.functional as F
 
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
+
+from battler.players.opponents import MaxDamagePlayer, RandomOpponentPlayer
 
 from ..data.datasets import ReplayBuffer, RLDataset
 from ..data.buffers import Experience
@@ -83,6 +87,7 @@ class DQNLightning(pl.LightningModule):
         batch_size: int = 4,
         net_kwargs: Dict = None,
         battle_format: str = 'gen7randombattle',
+        n_battles: int = 200,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -98,7 +103,28 @@ class DQNLightning(pl.LightningModule):
         self.batch_size = batch_size
         self.stack_size = stack_length
         self.battle_format = battle_format
-        self.loop = asyncio.new_event_loop()
+        self.n_battles = n_battles
+
+        '''
+        self.logger.log_hyperparams(
+            dict(
+                replay_size=self.replay_size,
+                warm_start_steps=self.warm_start_steps,
+                gamma=self.gamma,
+                eps_start=self.eps_start,
+                eps_end=self.eps_end,
+                eps_last_frame=self.eps_last_frame,
+                sync_rate=self.sync_rate,
+                lr=self.lr,
+                episode_length=self.episode_length,
+                batch_size=self.batch_size,
+                stack_size=self.stack_size,
+                battle_format=self.battle_format,
+                n_battles=self.n_battles,
+            )
+        )
+        '''
+        #self.loop = asyncio.new_event_loop()
         #asyncio.set_event_loop(self.loop)
 
         #self.env = gym.make(env)
@@ -108,7 +134,8 @@ class DQNLightning(pl.LightningModule):
         self.buffer = ReplayBuffer(self.replay_size)
         self.total_reward = 0
         self.episode_reward = 0
-
+        self.eval_opponents = None
+        self.eval_player = None
         # Delay setting up
         self.net = None
         self.target_net = None
@@ -123,9 +150,20 @@ class DQNLightning(pl.LightningModule):
         #from torchsummary import summary
         #summary(self.net.to('cuda'), (obs_size, self.stack_length)) 
         self.target_net = DQN(obs_size=obs_size, n_actions=n_actions, **self.net_kwargs)
-
         self.agent = Agent(env, self.buffer, stack_length=self.stack_size)
         self.opponent = opponent
+
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        eval_net = deepcopy(self.net)
+        eval_net.cpu()
+        eval_net.eval()
+
+        self.eval_player = DQNPlayer(
+                battle_format=self.battle_format, 
+                net=eval_net,
+                stack_size=self.stack_size)
+        self.eval_opponents = [(name, const(battle_format=self.battle_format)) for name, const in [("max", MaxDamagePlayer), ("random", RandomPlayer)]]
         #self.opponent.policy = utils.build_random_policy(n_actions)
         # TODO copy
         self.opponent.update_policy(self.target_net, 1.0)
@@ -198,33 +236,53 @@ class DQNLightning(pl.LightningModule):
 
         return F.smooth_l1_loss(state_action_values, expected_state_action_values)
     
+    # Using custom or multiple metrics (default_hp_metric=False)
+    def on_train_start(self):
+        self.logger.log_graph(self.net)
+        #self.logger.log_hyperparams(self.hparams, {"hp/metric_1": 0, "hp/metric_2": 0})
+
     # TODO battle format
     def training_epoch_end(self, outputs) -> None:
+        #print(outputs)
+        #print(len(outputs))
+        #print(type(outputs))
+        #self.logger.log_graph(self.net)
+        #for item in outputs:
+            #for key, value in item['log'].items():
+                #self.log(key, value)
         avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
-        player = DQNPlayer(
-            battle_format=self.battle_format, 
-            net=self.net, 
-            stack_size=self.stack_size,
-            max_concurrent_battles=0)
-        for opponent_type in ['random', 'max_damage']:
-            opponent = get_opponent(opponent_type)(battle_format=self.battle_format, max_concurrent_battles=0)
+        #loop = asyncio.new_event_loop()
+        #asyncio.set_event_loop(loop)
+        #self.log('agent', self.agent.log())
+        for key, value in self.agent.log().items():
+            self.log(key, value)
+
+        for name, opp in self.eval_opponents:
+        #for opponent_type in ['random', 'max_damage']:
+            #loop = asyncio.new_event_loop()
+            #asyncio.set_event_loop(loop)
+                #max_concurrent_battles=0)
+            #opponent = get_opponent(opponent_type)(battle_format=self.battle_format, max_concurrent_battles=0)
         
             #player.battle_against(opponent, n_battles=self.n_battles)
-            #asyncio.get_event_loop().run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
-            self.loop.run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
+            #loop.run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
+            self.eval_player.reset_battles()
+            self.loop.run_until_complete(self.eval_player.battle_against(opp, n_battles=self.n_battles))
 
-            results = dict(
-                avg_loss=avg_loss.item(),
-                opponent_type=opponent_type,
-                wins=player.n_won_battles,
-                finished=player.n_finished_battles,
-                ties=player.n_tied_battles,
-                losses=player.n_lost_battles,
-                win_rate=player.win_rate,
-            )
+            results = {
+                #f'{name}/avg_loss': avg_loss.item(),
+                #opponent_type=opponent_type,
+                f'{name}_wins': self.eval_player.n_won_battles,
+                f'{name}_finished': self.eval_player.n_finished_battles,
+                f'{name}_ties': self.eval_player.n_tied_battles,
+                f'{name}_losses': self.eval_player.n_lost_battles,
+                f'{name}_win_rate': self.eval_player.win_rate,
+            }
+            for key, value in results.items():
+                self.log(key, value)
+
             print(results)
-
-
+            #self.agent.env.reset_battles()
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
         """Carries out a single step through the environment to update the replay buffer. Then calculates loss
@@ -236,7 +294,7 @@ class DQNLightning(pl.LightningModule):
             Training loss and log metrics
         """
         device = self.get_device(batch)
-        epsilon = max(self.eps_end, self.eps_start - self.global_step + 1 / self.eps_last_frame)
+        epsilon = max(self.eps_end, self.eps_start - ((self.global_step + 1) / self.eps_last_frame))
 
         # step through environment with agent
         reward, done = self.agent.play_step(self.net, epsilon, device)
@@ -259,9 +317,11 @@ class DQNLightning(pl.LightningModule):
             "reward": torch.tensor(reward).to(device),
             "steps": torch.tensor(self.global_step).to(device),
             "epsilon": torch.tensor(epsilon).to(device),
-            #"win_rate": torch.tensor(self.agent.log()['win_rate']).to(device),
-            **self.agent.log(),
         }
+        self.log('loss', loss)
+        self.log('total_reward', self.total_reward)
+        self.log('steps', self.global_step)
+        self.log('epsilon', epsilon)
 
         return OrderedDict({"loss": loss, "log": log, "progress_bar": log})
 
@@ -269,7 +329,6 @@ class DQNLightning(pl.LightningModule):
         """Initialize Adam optimizer."""
         optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
         return [optimizer]
-
 
     def __dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences."""

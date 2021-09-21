@@ -38,13 +38,21 @@ def train(
     model_path: str,
 ) -> Dict:
 
+    #loop = asyncio.new_event_loop()
+    #asyncio.set_event_loop(loop)
 
     opp = get_opponent(opponent_type)(battle_format=battle_format)
     # Train the model
     trainer = Trainer(
         gpus=1,
-        accelerator='dp',
+        #accelerator='dp',
         max_epochs=epochs,
+        #log_every_n_steps=1,
+        flush_logs_every_n_steps=25_000,
+        #logger=pl.loggers.TensorBoardLogger(
+            #save_dir='tb_logs',
+            #name='battler',
+        #)
     )
     model = DQNLightning(
         **lightning_kwargs,
@@ -110,9 +118,7 @@ def dqn_evaluation(player, model_kwargs, model_state, nb_episodes=1000):
 from poke_env.player.env_player import Gen7EnvSinglePlayer
 from poke_env.player.utils import cross_evaluate
 from battler.deploy.dqn_player import DQNPlayer
-async def pit_players(players, n_challenges=20):
-    cross_evaluation = await cross_evaluate(players, n_challenges=20)
-    return cross_evaluation
+
 
 def evaluate_net(
     model,
