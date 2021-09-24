@@ -39,14 +39,18 @@ from pl_examples import cli_lightning_logo
 class PokeMLP(nn.Module):
     def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 256):
         super().__init__()
-        self.type_embedding = nn.Embedding(19, 3) # 1 higher for None
-        self.ability_embedding = nn.Embedding(247, 5)
+        self.type_embedding = nn.Embedding(20, 3) # 1 higher for None
+        self.ability_embedding = nn.Embedding(272, 5)
         # TODO verify dims
         self.item_embedding = nn.Embedding(923, 5)
         embedding_dim_delta = (3 + 3 + 5 + 5) - 4
-        net_input_dim = input_shape[0] + embedding_dim_delta
+        channels = 4
+        net_input_dim = (input_shape[1] + embedding_dim_delta) * channels
         print(f"input_dim {net_input_dim}")
         self.net = nn.Sequential(
+            nn.Conv1d(input_shape[0], 4, kernel_size=1),
+            nn.ReLU(),
+            nn.Flatten(),
             nn.Linear(net_input_dim, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
@@ -57,21 +61,30 @@ class PokeMLP(nn.Module):
     def forward(self, x):
 
         print(f"input: {x.shape}")
-        x_ints = torch.round(x[:, :4]).long()
-        print(x_ints.shape)
+        if len(x.shape) == 4:
+            x.squeeze_(1)
+        elif len(x.shape) < 3:
+            x.unsqueeze_(0)
+
+        print(f"input: {x.shape}")
+        x_ints = torch.round(x[:, :, :4]).long()
+        #print(x_ints.shape)
 
         print(x_ints)
-        type1 = self.type_embedding(x_ints[:, 0])
-        type2 = self.type_embedding(x_ints[:, 1])
-        ability = self.ability_embedding(x_ints[:, 2])
-        item = self.item_embedding(x_ints[:, 3])
+        type1 = self.type_embedding(x_ints[:, :, 0])
+        type2 = self.type_embedding(x_ints[:, :, 1])
+        ability = self.ability_embedding(x_ints[:, :, 2])
+        item = self.item_embedding(x_ints[:, :, 3])
 
-        print(f"pre cat: {x.shape}")
-        x = torch.cat((type1, type2, item, ability, x[:, 5:]), dim=1)
-        print(f"post cat: {x.shape}")
+        #print(f"pre cat: {x.shape}")
+        x = torch.cat((type1, type2, item, ability, x[:, :, 4:]), dim=-1)
+        #print(f"post cat: {x.shape}")
+        #x = torch.flatten(x)
+        #print(f"post flat: {x.shape}")
+        #print(f"post unsq: {x.shape}")
         x = self.net(x)
-        print(x.shape)
-        return x
+        #print(x.shape)
+        return x.squeeze(0)
     
 
 

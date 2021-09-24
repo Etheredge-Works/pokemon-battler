@@ -103,7 +103,7 @@ class RLPlayer(Gen8EnvSinglePlayer):
         self.state = None
         self.stack_size = stack_size
         self._observation_space = spaces.Box(
-            float("-inf"), float("inf"), shape=(self.obs_space,))
+            float("-inf"), float("inf"), shape=(stack_size, self.obs_space,))
             #float("-inf"), float("inf"), shape=(self.stack_size * self.obs_space,))
             #kfloat("-inf"), float("inf"), shape=(self.stack_size, self.obs_space,))
 
@@ -140,7 +140,7 @@ class RLPlayer(Gen8EnvSinglePlayer):
             self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
         else:
             self.state.append(battle_embedding)
-        return self.state
+        #return self.state
         #return battle_embedding
         return np.stack(self.state)
 

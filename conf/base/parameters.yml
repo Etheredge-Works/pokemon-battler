@@ -11,7 +11,7 @@ lightning_kwargs:
     # how many samples per epoch
     episode_length: 1_600  # episode_length / batch_size = iters/ (steps per epoch)
     batch_size: 32
-    stack_size: 1
+    stack_size: 64
     n_battles: 400
     eval_interval: 100
     obs_space: 70
@@ -36,7 +36,7 @@ dqn_kwargs:
     obs_size: 66
     n_actions: 17
     hidden_size: 128
-    stack_size: 32
+    stack_size: 64
     num_layers: 2
     out_channels: 4
     #num_heads: 1
