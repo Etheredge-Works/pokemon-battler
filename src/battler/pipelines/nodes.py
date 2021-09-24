@@ -9,7 +9,6 @@ import numpy as np
 from battler.models.dqn import DQN
 
 from battler.models.lightning import DQNLightning
-from battler.players.players import RandomOpponentPlayer
 #from battler.players.opponents import #OpponentPlayer
 
 #from poke_env.player.random_player import RandomPlayer
@@ -37,23 +36,33 @@ def train(
     net_kwargs: Dict,
     model_path: str,
 ) -> Dict:
+    #import cProfile, pstats, io
+    #pr = cProfile.Profile()
+    #pr.enable()
 
     #loop = asyncio.new_event_loop()
     #asyncio.set_event_loop(loop)
 
     opp = get_opponent(opponent_type)(battle_format=battle_format)
+    opp.stack_size = net_kwargs['stack_size'] # TODO clean up
+
+    # TODO move back in side func?
     # Train the model
     trainer = Trainer(
         gpus=1,
-        #accelerator='dp',
+        accelerator='dp',
         max_epochs=epochs,
         #log_every_n_steps=1,
-        flush_logs_every_n_steps=25_000,
-        #logger=pl.loggers.TensorBoardLogger(
+        flush_logs_every_n_steps=4_000,
+        logger=pl.loggers.TensorBoardLogger(
+            '.',
+            #log_graph=True,
+            default_hp_metric=False,
             #save_dir='tb_logs',
-            #name='battler',
-        #)
+            name='lightning_logs',
+        )
     )
+
     model = DQNLightning(
         **lightning_kwargs,
         net_kwargs=net_kwargs,
@@ -72,49 +81,24 @@ def train(
         opponent=opp,
         env_algorithm_kwargs=train_kwargs
     )
+
     trainer.save_checkpoint(model_path)
+    #pr.disable()
+    #s = io.StringIO.StringIO()
+    #ps = pstats.Stats(pr, stream=s)
+    #ps.dump_stats('/tmp/stats.dmp')
 
     # Return the model
     return dict(
-        model_state=model.net.state_dict(),
-        model_path=model_path
+        best_model_state=model.best_net.state_dict(),
+        best_model_kwargs=model.best_net.get_kwargs(),
+        #model_state=model.net.state_dict(),
+        #model_kwargs=model.net.get_kwargs(),
+        #model_path=model_path
     )
 
 
 from battler.utils import get_opponent
-
-def dqn_evaluation(player, model_kwargs, model_state, nb_episodes=1000):
-    # Reset battle statistics
-    player.reset_battles()
-
-    model = DQN(
-        obs_size=player.observation_space.shape[0],
-        n_actions=player.action_space.n,
-        **model_kwargs)
-    model.load_state_dict(model_state)
-    model.eval()
-
-    import torch.nn.functional as F
-    print("Evaluating model")
-    for _ in range(nb_episodes):
-        # Reset the environment
-        single_state = player.reset()
-        state = deque([single_state for _ in range(model_kwargs['stack_size'])], maxlen=model_kwargs['stack_size'])
-        done = False
-        while not done:
-            tensor_state = torch.tensor(state, dtype=torch.float32)
-            y = model(tensor_state).item()
-            probabilities = F.softmax(y)
-            action = torch.multinomial(probabilities, 1).item()
-
-            single_state, reward, done, _ = player.step(action)
-            state.append(single_state)
-
-    print(
-        "DQN Evaluation: %d victories out of %d episodes"
-        % (player.n_won_battles, player.n_finished_battles)
-    )
-
 from poke_env.player.env_player import Gen7EnvSinglePlayer
 from poke_env.player.utils import cross_evaluate
 from battler.deploy.dqn_player import DQNPlayer
@@ -127,8 +111,8 @@ def evaluate_net(
     opponent_type,
     n_battles,
 ):
-    player = DQNPlayer(battle_format=battle_format, net=model, stack_size=stack_size, max_concurrent_battles=0)
-    opponent = get_opponent(opponent_type)(battle_format=battle_format, max_concurrent_battles=0)
+    player = DQNPlayer(battle_format=battle_format, net=model, stack_size=stack_size, max_concurrent_battles=1)
+    opponent = get_opponent(opponent_type)(battle_format=battle_format, max_concurrent_battles=1)
 
     asyncio.get_event_loop().run_until_complete(
         player.battle_against(opponent, n_battles=n_battles))
@@ -154,6 +138,7 @@ def evaluate(
     n_battles: int = 20,
 ) -> Dict:
     # Evaluate the model
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
     #model = DQNLightning(**model_kwargs)
     #model.load_from_checkpoint(model_path)
@@ -162,13 +147,72 @@ def evaluate(
         #action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE)
     
     model = DQN(
-        obs_size=obs_space,
-        n_actions=action_space,
+        #obs_size=obs_space,
+        #n_actions=action_space,
         **model_kwargs)
     model.load_state_dict(model_state)
     results = evaluate_net(model, model_kwargs['stack_size'], battle_format, opponent_type, n_battles)
     print(results)
     return results
+
+def bless(
+    previous_best_model_state,
+    previous_best_model_kwargs,
+    model_state,
+    model_kwargs,
+    battle_format,
+    n_battles: int = 5000,
+):
+    # Evaluate the model
+    #model = DQNLightning(**model_kwargs)
+    #model.load_from_checkpoint(model_path)
+    #if battle_format == "gen7randombattle":
+        #action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE) - 1 # TODO why -1?
+        #action_space = len(Gen7EnvSinglePlayer._ACTION_SPACE)
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    
+    model = DQN(
+        **model_kwargs)
+    model.load_state_dict(model_state)
+    player = DQNPlayer(
+        battle_format=battle_format, 
+        net=model, 
+        stack_size=model_kwargs['stack_size'], 
+        max_concurrent_battles=0)
+
+    opp_model = DQN(
+        **previous_best_model_kwargs)
+    opp_model.load_state_dict(previous_best_model_state)
+    opponent = DQNPlayer(
+        battle_format=battle_format, 
+        net=opp_model, 
+        stack_size=previous_best_model_kwargs['stack_size'], 
+        max_concurrent_battles=0)
+    asyncio.get_event_loop().run_until_complete(
+        player.battle_against(opponent, n_battles=n_battles))
+    # TODO another stage pitting max self versus probabilistic self
+
+    results = dict(
+        wins=player.n_won_battles,
+        finished=player.n_finished_battles,
+        ties=player.n_tied_battles,
+        losses=player.n_lost_battles,
+        win_rate=player.win_rate,
+    )
+
+    if player.win_rate > opponent.win_rate:
+        best_model_state = model.state_dict()
+        best_model_kwargs = model_kwargs
+    else:
+        best_model_state = previous_best_model_state
+        best_model_kwargs = previous_best_model_kwargs
+
+    return dict(
+        results=results,
+        blessed_model_state=best_model_state,
+        blessed_model_kwargs=best_model_kwargs,
+    )
+
 
 # TODO use RL player instead of other kinds. can pull out action/obs space
 # TODO is iterator frozen? or does it get new steps?

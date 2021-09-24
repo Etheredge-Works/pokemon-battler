@@ -61,12 +61,14 @@ class Agent:
             if device not in ["cpu"]:
                 state = state.cuda(device)
             # TODO apply softmax probabilities here
-            q_values = net(state)
-            #_, action = torch.max(q_values, dim=1)
-            probabilities = F.softmax(q_values, dim=1) # 2d shape
-            action = int(torch.multinomial(probabilities, 1).item())
+            #q_values = net(state)
+            with torch.no_grad():
+                q_values = net(state)
+                _, action = torch.max(q_values, dim=1)
+            #probabilities = F.softmax(q_values, dim=1) # 2d shape
+            #action = int(torch.multinomial(probabilities, 1).item())
 
-            #action = int(action.item())
+            action = int(action.item())
 
         return action
 

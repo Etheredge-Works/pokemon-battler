@@ -158,3 +158,6 @@ venv.bak/
 .mypy_cache/
 lightning_logs/
 .vscode/
+old_lightning_logs/
+ppo_logs/
+.gitignore

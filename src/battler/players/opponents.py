@@ -14,7 +14,7 @@ from battler.utils import embed
 def build_static_policy(net: nn.Module, prob: float) -> Callable:
     def policy(battle: AbstractBattle) -> int:
         if np.random.random() < prob:
-            return np.random.randint(net.action_size)
+            return np.random.randint(net.n_actions)
         else:
             encoded_state = torch.Tensor([embed.embed_battle(battle)])
             return net(encoded_state).argmax().item()
@@ -26,7 +26,7 @@ def build_stocastic_policy(net: nn.Module, stack_length: int, prob: float = 1.0)
     
     def policy(battle: AbstractBattle) -> int:
         if np.random.random() < prob:
-            return np.random.randint(net.action_size)
+            return np.random.randint(net.n_actions)
             # TODO self.choos_random_move(battle)?
         else:
             encoded_state = embed.embed_battle(battle)

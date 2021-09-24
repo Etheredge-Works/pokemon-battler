@@ -12,3 +12,34 @@
 
 - increase n for log flushing
 - https://pytorch-lightning.readthedocs.io/en/stable/extensions/logging.html#:~:text=you%20want%20to%20track,metrics%20tracking%20within%20LightningModule.
+
+- should have wrapped environment rather than writing stacking logic
+- figure out why trainer accelerator dp 2x+ training (maybe not)
+- any way to incorporate model based stuff for common ou/uu builds? 
+- predicting pokemon moves is a bit of a pain
+
+- add logging of action selections or maybe action weights to see if attacks are chosen more often
+- figure out why seems to do batches of 4 on iterator...
+- getting rid of num workers kept the bool error to only once at the start
+- also seems to have sole the problem of seemingly small batches
+- why does it slow down after first eval of players?
+- why does showdown log [slow battle]
+
+- could time evaluation and run it ever so many seconds based on how long it takes to run
+- profile the training
+
+- add in previous best agent for plotting performance or for training opponent
+- TODO add super negative weight for invalid moves instead of just doing a random ones
+- does open AI five use stats of characters in their models?
+- test how fast 2 random agents can battle each other (how many steps per second)
+- parallel agents? the bottle neck seemst o be stepping
+- to get self oppoentn working, i need to wrap the env with stacking
+
+# Encodings
+## history
+- pokemon encoding
+- move encoding
+- optional
+  - damage caused (can be seen in hps)
+  - stats changed (can be seen in boosts)
+  -

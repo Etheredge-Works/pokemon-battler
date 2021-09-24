@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 from battler.utils.pokemon_embed import PokemonEmbed, MoveEmbed
 
@@ -18,7 +19,6 @@ class DQN(nn.Module):
         out_channels: int = 1,
         hidden_size: int = 512,
         num_layers: int = 2,
-
     ):
         """
         Args:
@@ -28,7 +28,15 @@ class DQN(nn.Module):
         """
         super().__init__()
 
-        self.action_size = n_actions
+        self.obs_size = obs_size
+        self.stack_size = stack_size
+        self.n_actions = n_actions
+        self.out_channels = out_channels
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        # Required for tensorboard graph from lightning
+        self.example_input_array = torch.zeros(stack_size, obs_size) 
 
         #layers += [
             # 4 x 184 -> 184
@@ -52,6 +60,7 @@ class DQN(nn.Module):
         ]
 
         layers += [
+            #nn.Linear(obs_size*stack_size, hidden_size), 
             nn.Linear(obs_size*out_channels, hidden_size), 
             #nn.Linear(obs_size*stack_size, hidden_size), 
             nn.ReLU(), 
@@ -61,10 +70,32 @@ class DQN(nn.Module):
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(hidden_size, hidden_size))
             layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_size, n_actions))
+        #layers.append(nn.Linear(hidden_size, n_actions))
 
         # Action values
+        self.value = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, 1),
+        )
+
+        self.advantage = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, n_actions),
+        )
+
         self.net = nn.Sequential(*layers)
+    
+    def get_kwargs(self):
+        return {
+            "obs_size": self.obs_size,
+            "stack_size": self.stack_size,
+            "n_actions": self.n_actions,
+            "out_channels": self.out_channels,
+            "hidden_size": self.hidden_size,
+            "num_layers": self.num_layers,
+        }
 
     def forward(self, x):
         #pls = self.conv(x)
@@ -72,4 +103,8 @@ class DQN(nn.Module):
         #x = nn.functional.flatten(x, dim=1)
         #print(f"x size: {x.size()}")
 
-        return self.net(x.float())
+        features = self.net(x.float())
+        values = self.value(features)
+        advantages = self.advantage(features)
+        qvals = values + (advantages - advantages.mean())
+        return qvals

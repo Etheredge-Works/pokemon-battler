@@ -11,7 +11,7 @@ class RLDataset(IterableDataset):
     <...reinforce_learn_Qnet.RLDataset object at ...>
     """
 
-    def __init__(self, buffer: ReplayBuffer, sample_size: int = 10) -> None:
+    def __init__(self, buffer: ReplayBuffer, sample_size: int) -> None:
         """
         Args:
             buffer: replay buffer

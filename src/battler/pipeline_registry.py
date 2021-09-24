@@ -32,6 +32,7 @@ from typing import Dict
 from kedro.pipeline import Pipeline
 
 from .pipelines.pipeline import create_data_pipeline
+from .pipelines import ppo
 
 
 def register_pipelines() -> Dict[str, Pipeline]:
@@ -40,10 +41,14 @@ def register_pipelines() -> Dict[str, Pipeline]:
     Returns:
         A mapping from a pipeline name to a ``Pipeline`` object.
     """
-    train, eval = create_data_pipeline()
+    #train, eval, bless = create_data_pipeline()
+    ppo_train = ppo.create_pipeline()
     return {
-        "dqn_train": train,
-        "dqn_eval": eval,
-        "dqn": train+eval,
-        "__default__": train+eval
+        "ppo": ppo_train,
+        #"dqn_train": train,
+        #"dqn_eval": eval,
+        #"dqn_bless": bless,
+        #"dqn": train+eval+bless,
+        "__default__": ppo_train
+        #"__default__": train+eval+bless
     }

@@ -1,5 +1,6 @@
 import asyncio
 from collections import deque
+from copy import deepcopy
 
 from poke_env.player.random_player import RandomPlayer
 from poke_env.player.player import Player
@@ -15,18 +16,22 @@ from poke_env.environment.battle import AbstractBattle
 
 
 class DQNPlayer(Player):
-    def __init__(self, *args, net, stack_size, **kwargs):
+    def __init__(self, *args, net=None, stack_size=None, **kwargs):
         super().__init__(*args, **kwargs)
-        net.eval()
         self.state = None
         self.stack_size = stack_size
         #self.policy = build_eval_stocastic_policy(net)
         self.net = net
+        if self.net is not None:
+            self.net.cpu()
+            self.net.eval()
 
     def _battle_finished_callback(self, battle: AbstractBattle) -> None:
         self.stack = None
 
     def choose_move(self, battle):
+        if self.net is None:
+            return self.choose_random_move(battle)
         encoded_state = embed_battle(battle)
         if self.state is None:
             self.state = deque([encoded_state for _ in range(self.stack_size)], maxlen=self.stack_size)
@@ -34,11 +39,20 @@ class DQNPlayer(Player):
             self.state.append(encoded_state)
 
         tensor_state = torch.Tensor([self.state])
-        y = self.net(tensor_state)
-        probabilities = F.softmax(y, dim=1)
-        action = torch.multinomial(probabilities, 1).item()
+        with torch.no_grad():
+            y = self.net(tensor_state)
+            #probabilities = F.softmax(y, dim=1)
+            #action = torch.multinomial(probabilities, 1).item()
+            _, action = torch.max(y, dim=1)
+            action = action.item()
+
 
         return self._action_to_move(action, battle)
+    
+    def update_policy(self, net, epsilon: float):
+        self.net = deepcopy(net)
+        self.net.cpu()
+        self.net.eval()
 
     def _action_to_move(self, action, battle):
         if (

@@ -74,6 +74,7 @@ class DQNLightning(pl.LightningModule):
     def __init__(
         self,
         #env: str,
+        batch_size: int = 32, # TODO why is this propogated to the agent?
         replay_size: int = 1_000_000,
         warm_start_steps: int = 200_000,
         gamma: float = 0.99,
@@ -84,13 +85,14 @@ class DQNLightning(pl.LightningModule):
         lr: float = 1e-3,
         episode_length: int = 100_000,
         stack_length: int = 2,
-        batch_size: int = 4,
         net_kwargs: Dict = None,
         battle_format: str = 'gen7randombattle',
         n_battles: int = 200,
+        eval_interval: int = 10,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        self.save_hyperparameters()
         self.replay_size = replay_size
         self.warm_start_steps = warm_start_steps
         self.gamma = gamma
@@ -104,6 +106,7 @@ class DQNLightning(pl.LightningModule):
         self.stack_size = stack_length
         self.battle_format = battle_format
         self.n_battles = n_battles
+        self.eval_interval = eval_interval
 
         '''
         self.logger.log_hyperparams(
@@ -131,6 +134,7 @@ class DQNLightning(pl.LightningModule):
         #self.env = env
         #obs_size = self.env.observation_space.shape[0]
 
+        # TODO can do priority buffer since it's already here
         self.buffer = ReplayBuffer(self.replay_size)
         self.total_reward = 0
         self.episode_reward = 0
@@ -142,16 +146,13 @@ class DQNLightning(pl.LightningModule):
         self.agent = None
         self.val_opponent = None
         self.net_kwargs = net_kwargs or {}
+        self.best_win_rate = -1
+        self.best_net = None
 
-    def build(self, env, opponent, val_env=None, val_opponent=None):
-        obs_size = env.observation_space.shape[0]
-        n_actions = env.action_space.n
-        self.net = DQN(obs_size=obs_size, n_actions=n_actions, **self.net_kwargs)
+        self.net = DQN(**self.net_kwargs)
         #from torchsummary import summary
         #summary(self.net.to('cuda'), (obs_size, self.stack_length)) 
-        self.target_net = DQN(obs_size=obs_size, n_actions=n_actions, **self.net_kwargs)
-        self.agent = Agent(env, self.buffer, stack_length=self.stack_size)
-        self.opponent = opponent
+        self.target_net = DQN(**self.net_kwargs)
 
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -162,11 +163,24 @@ class DQNLightning(pl.LightningModule):
         self.eval_player = DQNPlayer(
                 battle_format=self.battle_format, 
                 net=eval_net,
-                stack_size=self.stack_size)
-        self.eval_opponents = [(name, const(battle_format=self.battle_format)) for name, const in [("max", MaxDamagePlayer), ("random", RandomPlayer)]]
+                stack_size=self.stack_size,
+                # TODO test removing
+                max_concurrent_battles=self.n_battles,
+        )
+        self.eval_opponents = [
+            (name, const(
+                battle_format=self.battle_format, 
+                max_concurrent_battles=self.n_battles
+            )) 
+            for name, const in [("max_damage", MaxDamagePlayer), ("random", RandomPlayer)]
+        ]
         #self.opponent.policy = utils.build_random_policy(n_actions)
         # TODO copy
+ 
+    def build(self, env, opponent, val_env=None, val_opponent=None):
+        self.opponent = opponent
         self.opponent.update_policy(self.target_net, 1.0)
+        self.agent = Agent(env, self.buffer, stack_length=self.stack_size)
         self.populate(self.warm_start_steps)
 
     def update_opponent(self, opponent):
@@ -199,13 +213,13 @@ class DQNLightning(pl.LightningModule):
             loss
         """
         states, actions, rewards, dones, next_states = batch
-        #print(states.size())
 
         state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-        #target_state_action_values = self.target_net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
 
         with torch.no_grad():
-            next_state_values = self.target_net(next_states).max(1)[0]
+            next_state_values_idx = self.target_net(next_states).argmax(1)
+            next_state_values = self.net(next_states)
+            next_state_values = next_state_values.gather(1, next_state_values_idx.unsqueeze(-1)).squeeze(-1)
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
@@ -223,23 +237,93 @@ class DQNLightning(pl.LightningModule):
         states, actions, rewards, dones, next_states = batch
 
         state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-        #next_state_action_values = self.net(next_states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-        #best_action_idx = next_state_action_values.argmax(1)
 
         with torch.no_grad():
-            next_state_values = self.target_net(next_states).max(1)[0]
-            #next_state_values = self.target_net(next_states)[best_action_idx]
+            next_state_values_idx = self.target_net(next_states).argmax(1)
+            next_state_values = self.net(next_states)
+            next_state_values = next_state_values.gather(1, next_state_values_idx.unsqueeze(-1)).squeeze(-1)
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
         expected_state_action_values = next_state_values * self.gamma + rewards
-
         return F.smooth_l1_loss(state_action_values, expected_state_action_values)
+
+        #states, actions, rewards, dones, next_states = batch
+
+        #state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        #next_state_action_values = self.net(next_states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        #best_action_idx = next_state_action_values.argmax(1)
+
+        #with torch.no_grad():
+            #next_state_values = self.target_net(next_states).max(1)[0]
+            #next_state_values_action = self.target_net(next_states).max(1)[0]
+            #next_state_values = self.target_net(next_states)[best_action_idx]
+            #next_state_values[dones] = 0.0
+            #next_state_values = next_state_values.detach()
+
+        #expected_state_action_values = next_state_values * self.gamma + rewards
+
+        #return F.smooth_l1_loss(state_action_values, expected_state_action_values)
     
     # Using custom or multiple metrics (default_hp_metric=False)
+    def on_fit_end(self):
+        self.loop.close()
+
     def on_train_start(self):
         self.logger.log_graph(self.net)
-        #self.logger.log_hyperparams(self.hparams, {"hp/metric_1": 0, "hp/metric_2": 0})
+        #self.logger.log_hyperparams(self.hparams, self.hparams)
+        self.logger.log_hyperparams(self.hparams, {
+            #"hp/replay_size": self.replay_size,
+            "hp/batch_size": self.batch_size,
+            "hp/stack_size": self.stack_size,
+            "hp/gamma": self.gamma,
+            "hp/lr": self.lr,
+            "hp/episode_length": self.episode_length,
+            "hp/warm_start_steps": self.warm_start_steps,
+            "hp/sync_rate": self.sync_rate,
+            "hp/eps_start": self.eps_start,
+            "hp/eps_end": self.eps_end,
+            "hp/eps_last_frame": self.eps_last_frame,
+        })
+        #self.logger.log_hyperparams(, {"hp/metric_1": 0, "hp/metric_2": 0})
+
+    def evaluate_battler(self, log=True):
+        self.eval_player.net = deepcopy(self.net)
+        self.eval_player.net.cpu()
+        self.eval_player.net.eval()
+        for name, opp in self.eval_opponents:
+            # TODO pull out to function, don't wont to recreate agent every time 
+            self.eval_player.reset_battles()
+            self.loop.run_until_complete(self.eval_player.battle_against(opp, n_battles=self.n_battles))
+
+            results = {
+                f'{name}/wins': self.eval_player.n_won_battles,
+                f'{name}/finished': self.eval_player.n_finished_battles,
+                f'{name}/ties': self.eval_player.n_tied_battles,
+                f'{name}/losses': self.eval_player.n_lost_battles,
+                f'{name}/win_rate': self.eval_player.win_rate,
+            }
+            # TODO 
+            if name == 'max_damage' and self.eval_player.win_rate > self.best_win_rate:
+                self.best_win_rate = self.eval_player.win_rate
+                self.best_net = deepcopy(self.net)
+
+            if log:
+                for key, value in results.items():
+                    self.log(key, value)
+            #print(results)
+
+    def on_train_end(self):
+        """Evaluates the DQN agent on the environment.
+        Args:
+            net: network to evaluate
+            n_episodes: number of episodes to evaluate for
+            render: whether to render the environment
+        Returns:
+            mean reward over the episodes
+        """
+        pass
+        self.evaluate_battler(False)
 
     # TODO battle format
     def training_epoch_end(self, outputs) -> None:
@@ -251,38 +335,22 @@ class DQNLightning(pl.LightningModule):
             #for key, value in item['log'].items():
                 #self.log(key, value)
         avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
+        self.log('avg_loss', avg_loss)
+        self.log('epsilon', self.epsilon)
+        self.log('target_updates', self.global_step // self.sync_rate)
         #loop = asyncio.new_event_loop()
         #asyncio.set_event_loop(loop)
         #self.log('agent', self.agent.log())
         for key, value in self.agent.log().items():
             self.log(key, value)
 
-        for name, opp in self.eval_opponents:
-        #for opponent_type in ['random', 'max_damage']:
-            #loop = asyncio.new_event_loop()
-            #asyncio.set_event_loop(loop)
-                #max_concurrent_battles=0)
-            #opponent = get_opponent(opponent_type)(battle_format=self.battle_format, max_concurrent_battles=0)
-        
-            #player.battle_against(opponent, n_battles=self.n_battles)
-            #loop.run_until_complete(player.battle_against(opponent, n_battles=self.n_battles))
-            self.eval_player.reset_battles()
-            self.loop.run_until_complete(self.eval_player.battle_against(opp, n_battles=self.n_battles))
+        #if self.global_step % (40*self.sync_rate) == 0:
+        if self.current_epoch % self.eval_interval == 0:
+            self.evaluate_battler()
 
-            results = {
-                #f'{name}/avg_loss': avg_loss.item(),
-                #opponent_type=opponent_type,
-                f'{name}_wins': self.eval_player.n_won_battles,
-                f'{name}_finished': self.eval_player.n_finished_battles,
-                f'{name}_ties': self.eval_player.n_tied_battles,
-                f'{name}_losses': self.eval_player.n_lost_battles,
-                f'{name}_win_rate': self.eval_player.win_rate,
-            }
-            for key, value in results.items():
-                self.log(key, value)
-
-            print(results)
-            #self.agent.env.reset_battles()
+    @property
+    def epsilon(self) -> float:
+        return max(self.eps_end, self.eps_start - ((self.global_step + 1) / self.eps_last_frame))
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
         """Carries out a single step through the environment to update the replay buffer. Then calculates loss
@@ -294,14 +362,15 @@ class DQNLightning(pl.LightningModule):
             Training loss and log metrics
         """
         device = self.get_device(batch)
-        epsilon = max(self.eps_end, self.eps_start - ((self.global_step + 1) / self.eps_last_frame))
+        epsilon = self.epsilon
 
         # step through environment with agent
         reward, done = self.agent.play_step(self.net, epsilon, device)
         self.episode_reward += reward
 
         # calculates training loss
-        loss = self.dqn_mse_loss(batch)
+        #loss = self.dqn_mse_loss(batch)
+        loss = self.dqn_huber_loss(batch)
 
         if done:
             self.total_reward = self.episode_reward
@@ -318,10 +387,13 @@ class DQNLightning(pl.LightningModule):
             "steps": torch.tensor(self.global_step).to(device),
             "epsilon": torch.tensor(epsilon).to(device),
         }
-        self.log('loss', loss)
-        self.log('total_reward', self.total_reward)
-        self.log('steps', self.global_step)
-        self.log('epsilon', epsilon)
+
+        # TODO log this more often to observe surprise
+        #self.log('loss', loss)
+
+        #self.log('total_reward', self.total_reward)
+        #self.log('steps', self.global_step)
+        #self.log('epsilon', epsilon)
 
         return OrderedDict({"loss": loss, "log": log, "progress_bar": log})
 
@@ -336,8 +408,10 @@ class DQNLightning(pl.LightningModule):
         dataloader = DataLoader(
             dataset=dataset, 
             batch_size=self.batch_size, 
-            sampler=None,
-            num_workers=8)
+            #sampler=None,
+            persistent_workers=True,
+            num_workers=1, # is this cuasing it to only run less iterations?
+        )
         return dataloader
 
     def train_dataloader(self) -> DataLoader:

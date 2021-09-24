@@ -15,6 +15,7 @@ async def main(player_constructor: Player):
         player_configuration=PlayerConfiguration(os.environ["USERNAME"], os.environ["PASSWORD"]),
         server_configuration=ShowdownServerConfiguration,
         max_concurrent_battle=MAX_CONCURRENT_BATTLE,
+        start_timer_on_battle_start=True,  # Prevents players from spamming the agent as much
     )
 
     await player.accept_challenges(None, N_BATTLES)
