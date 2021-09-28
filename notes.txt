@@ -43,3 +43,7 @@
   - damage caused (can be seen in hps)
   - stats changed (can be seen in boosts)
   -
+
+for multi opponents, keep queue of thread links
+start new opponent on process and keep link to their id for chalange
+when popping off, shut dwon that process

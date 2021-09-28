@@ -11,24 +11,28 @@ def train_wrapper(
     env, opponent, other
 ):
     trainer = Trainer(
-        gpus=0,
+        gpus=1,
         accelerator='dp',
         max_epochs=1000,
         #log_every_n_steps=1,
         flush_logs_every_n_steps=4_000,
-        logger=pl.loggers.TensorBoardLogger(
-            '.',
+        logger=pl.loggers.MLFlowLogger(
+            experiment_name='ppo_lightning',
+        )
+        #logger=pl.loggers.TensorBoardLogger(
+            #'.',
             #log_graph=True,
             #default_hp_metric=False,
             #save_dir='tb_logs',
-            name='ppo_logs',
-        )
+            #name='ppo_logs',
+        #)
     )
     model = PPOLightning(env)
     trainer.fit(model)
     other['model'] = model
     other['trainer'] = trainer
 
+# TODO use attention and pad moves
 # TODO trainer kwargs
 def train(
     battle_format: str,

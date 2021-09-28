@@ -32,77 +32,296 @@ from torch import nn
 from torch.distributions import Categorical, Normal
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, IterableDataset
+import torch.nn.functional as F
 
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
+from copy import deepcopy
+from icecream import ic
+from battler.utils.encoders.abilities import GEN8_POKEMON, GEN8_ABILITIES
+
+
+from poke_env.environment.weather import Weather
+from poke_env.environment.status import Status
+from poke_env.environment.pokemon_type import PokemonType
+
+class PokemonNet(nn.Module):
+    def __init__(self,
+        name_embedding_dim: int = 10,
+        status_embedding_dim: int = 2,
+        type_embedding_dim: int = 3,
+        ability_embedding_dim: int = 6,
+        item_embedding_dim: int = 10,
+    ):
+        self.name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
+        self.status_embedding = nn.Embedding(len(Status)+2, 2)
+
+        # used twice
+        self.type1_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+        self.type2_embedding = self.type1_embedding
+        #_type2_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+
+        self.ability_embedding = nn.Embedding(272, 6)
+        # TODO verify dims
+        self.item_embedding = nn.Embedding(923, 10)
+
+        self.per_poke_enum_dim = \
+            self.name_embedding.embedding_dim + \
+            self.type1_embedding.embedding_dim + \
+            self.type2_embedding.embedding_dim + \
+            self.ability_embedding.embedding_dim + \
+            self.item_embedding.embedding_dim + \
+            self.status_embedding.embedding_dim
+
+        self.net = nn.Sequential(
+            #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
+            nn.Linear(self.per_poke_embedding_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+        )
+    
+    def input_dim(self):
+        return 126
+
+    def output_dim(self):
+        return 64
+
+    def forward(self, x):
+        x_ints = x[:, :, :36].long()
+
+        names = self.name_embedding(x_ints[:, :, 0:6]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        status = self.status_embedding(x_ints[:, :, 6:12]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        type1 = self.type1_embedding(x_ints[:, :, 12:18]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        type2 = self.type2_embedding(x_ints[:, :, 18:24]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        ability = self.ability_embedding(x_ints[:, :, 24:30]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        item = self.item_embedding(x_ints[:, :, 30:36]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+
+        pokes = x[:, :, 36:126].view(x_ints.shape[0], x_ints.shape[1], 6, 15)
+
+        poke_x = torch.cat([pokes, names, status, type1, type2, ability, item], dim=-1)
+
+        poke_x = self.per_poke_net(poke_x)
+        poke_x = poke_x.view(x_ints.shape[0], x_ints.shape[1], -1)
+        return poke_x
+
 
 class PokeMLP(nn.Module):
+    #NUM_TYPES = ##6
+    '''
+    layout:
+    0: weather
+    1-6: pokemons_names
+    7-12: pokemons status
+    13-18: pokemons types 1
+    19-24: pokemons types 2
+    25-30: pokemons abilities
+    31-36: pokemons items
+    31-36: pokemons items
+
+    '''
+    _weather_embedding = nn.Embedding((len(Weather)+2), 2)
+
+    _name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
+    _status_embedding = nn.Embedding(len(Status)+2, 2)
+
+    # used twice
+    _type1_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+    _type2_embedding = _type1_embedding
+    #_type2_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+
+    _ability_embedding = nn.Embedding(272, 6)
+    # TODO verify dims
+    _item_embedding = nn.Embedding(923, 10)
+    #num_poke_embeddings = (6*6)
+    #num_embeddings = (5*6*2) + 1
+
+    # TODO use layer input size here
+    per_poke_enum_dim = \
+        _name_embedding.embedding_dim + \
+        _type1_embedding.embedding_dim + \
+        _type2_embedding.embedding_dim + \
+        _ability_embedding.embedding_dim + \
+        _item_embedding.embedding_dim + \
+        _status_embedding.embedding_dim
+    ic(per_poke_enum_dim)
+        #10 + 2 + 3 + 3 + 6 + 10
+    #ic(per_poke_enum_dim)
+
+    # Net for pokemon info
+    poke_floats = 15
+    per_poke_embedding_dim = per_poke_enum_dim + poke_floats
+    #ic(per_poke_embedding_dim)
+    _per_poke_net = nn.Sequential(
+        #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
+        nn.Linear(per_poke_embedding_dim, 256),
+        nn.ReLU(),
+        nn.Linear(256, 128),
+        nn.ReLU(),
+        nn.Linear(128, 64),
+        nn.ReLU(),
+    )
+    #_opp_per_poke_net = deepcopy(_per_poke_net)
+    _opp_per_poke_net = _per_poke_net
+    # TODO test opp_poke_embedding_net = deepcopy(poke_embedding_net)
+
+    move_dim = 20
+    _move_net = nn.Sequential(
+        nn.Linear((move_dim-1) + _type1_embedding.embedding_dim, 64),
+        nn.ReLU(),
+        nn.Linear(64, 32),
+        nn.ReLU(),
+        nn.Linear(32, 8),
+        nn.ReLU(),
+    )
+
+
     def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 256):
         super().__init__()
-        self.type_embedding = nn.Embedding(20, 3) # 1 higher for None
-        self.ability_embedding = nn.Embedding(272, 5)
-        # TODO verify dims
-        self.item_embedding = nn.Embedding(923, 5)
-        embedding_dim_delta = (3 + 3 + 5 + 5) - 4
-        channels = 4
-        net_input_dim = (input_shape[1] + embedding_dim_delta) * channels
-        print(f"input_dim {net_input_dim}")
+        # I'm not sure why +2. +1 is to account for None
+        self.weather_embedding = self._weather_embedding
+        self.name_embedding = self._name_embedding
+        self.status_embedding = self._status_embedding
+        self.type1_embedding = self._type1_embedding
+        self.type2_embedding = self._type2_embedding
+        self.ability_embedding = self._ability_embedding
+        self.item_embedding = self._item_embedding
+        self.per_poke_net = self._per_poke_net
+        ic(self.per_poke_net)
+        self.opp_poke_net = self._opp_per_poke_net
+
+        self.move_net = self._move_net
+        ic(self.move_net)
+
+        # TODO param poke_net
+        pre_converted_dims = 1 + ((15+6) * 12)
+        ic(pre_converted_dims)
+        #converted_dims = (self.per_poke_enum_dim * 12) + self.weather_embedding.embedding_dim
+        post_converted_dims = (12 * 64) + self.weather_embedding.embedding_dim
+        ic(post_converted_dims)
+
+        #poke_dims = self.per_poke_net.
+        embedding_dim_delta =  post_converted_dims - pre_converted_dims
+        ic(embedding_dim_delta)
+        conv_out_channels = 2
+
+        #ic(input_shape)
+        moves_flattened_dim = 6 * 4 * 8 * 2
+        moves_dim_delta = moves_flattened_dim - (self.move_dim*12*4) - 1
+        frame_dim = input_shape[1] + embedding_dim_delta + moves_dim_delta
+        net_input_dim = (input_shape[1] + embedding_dim_delta) * conv_out_channels
+        ic(net_input_dim) # shoudl be 576
+        # TODO keep testing reflex agents
+        # TODO the agent does seem to behave differently based on previous attacks
         self.net = nn.Sequential(
-            nn.Conv1d(input_shape[0], 4, kernel_size=1),
+            # Shuffle inforation across frame
+            nn.Conv1d(input_shape[0], 32, kernel_size=1),
+            #nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Conv1d(32, 16, kernel_size=1),
+            #nn.BatchNorm1d(16),
+            nn.ReLU(),
+            nn.Conv1d(16, 8, kernel_size=1),
+            #nn.BatchNorm1d(8),
+            nn.ReLU(),
+
+            # Shuffle inforation inside frame
+            nn.Linear(frame_dim, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+
+            nn.Conv1d(8, conv_out_channels, kernel_size=1),
+            # TODO make sure using eval mode other places if using batchnorm? not used elsewhere
+            #nn.BatchNorm1d(conv_out_channels),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(net_input_dim, hidden_size),
+            #nn.Linear(net_input_dim, hidden_size),
+            nn.Linear(hidden_size*conv_out_channels, hidden_size),
+            #nn.Dropout(0.2),
+            #nn.Linear(net_input_dim//conv_out_channels, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, n_actions),
         )
+        ic(self.net)
+        self.moves_range = self.move_dim * 4 * 6 
+
+    def move_forward(self, x, net):
+        moves_raw = x[:, : , :self.moves_range].view(*x.shape[0:2], 6, 4, self.move_dim)
+        ##ic(moves_raw.shape)
+        int_in = moves_raw[:, :, :, :, 0].long()
+        #ic(int_in.shape)
+        type_x = self.type1_embedding(int_in)
+        #ic(type_x.shape)
+        x = torch.cat((moves_raw[:, :, :, :, 1:], type_x), dim=-1)
+        #ic(x.shape)
+        y = net(x)
+        #ic(y.shape)
+        return y
+
+
+    def poke_forward(self, x, net):
+        x_ints = x[:, :, :36].long()
+
+        names = self.name_embedding(x_ints[:, :, 0:6]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        status = self.status_embedding(x_ints[:, :, 6:12]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        type1 = self.type1_embedding(x_ints[:, :, 12:18]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        type2 = self.type2_embedding(x_ints[:, :, 18:24]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        ability = self.ability_embedding(x_ints[:, :, 24:30]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+        item = self.item_embedding(x_ints[:, :, 30:36]).view(x_ints.shape[0], x_ints.shape[1], 6, -1)
+
+        pokes = x[:, :, 36:126].view(x_ints.shape[0], x_ints.shape[1], 6, 15)
+
+        poke_x = torch.cat([pokes, names, status, type1, type2, ability, item], dim=-1)
+
+        poke_x = net(poke_x)
+        poke_x = poke_x.view(x_ints.shape[0], x_ints.shape[1], -1)
+        return poke_x
     
     def forward(self, x):
 
-        print(f"input: {x.shape}")
+        #ic()
+        #ic(x.shape)
+        #print(f"input: {x.shape}")
         if len(x.shape) == 4:
             x.squeeze_(1)
         elif len(x.shape) < 3:
             x.unsqueeze_(0)
 
-        print(f"input: {x.shape}")
-        x_ints = torch.round(x[:, :, :4]).long()
-        #print(x_ints.shape)
+        x_ints = torch.round(x[:, :, :1]).long()
 
-        print(x_ints)
-        type1 = self.type_embedding(x_ints[:, :, 0])
-        type2 = self.type_embedding(x_ints[:, :, 1])
-        ability = self.ability_embedding(x_ints[:, :, 2])
-        item = self.item_embedding(x_ints[:, :, 3])
+        weather = self.weather_embedding(x_ints[:, :, 0:1]).view(x_ints.shape[0], x_ints.shape[1], -1)
 
-        #print(f"pre cat: {x.shape}")
-        x = torch.cat((type1, type2, item, ability, x[:, :, 4:]), dim=-1)
-        #print(f"post cat: {x.shape}")
-        #x = torch.flatten(x)
-        #print(f"post flat: {x.shape}")
-        #print(f"post unsq: {x.shape}")
+
+        ally_moves_delta = 254 + self.moves_range
+        ally_move_x = self.move_forward(x[:, :, 254:ally_moves_delta], self.move_net)
+        #ic(ally_move_x.shape)
+        ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
+
+        opp_move_delts = ally_moves_delta + self.moves_range
+        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.move_net)
+        #ic(opp_move_x.shape)
+        opp_move_x = opp_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
+        #ic(opp_move_x.shape)
+
+        # Friendly Pokes
+        poke_x = self.poke_forward(x[:, :, 1:127], self.per_poke_net)
+
+        # Opponent Pokes
+        opp_poke_x = self.poke_forward(x[:, :, 127:254], self.opp_poke_net)
+
+        # TODO handle type encoding in moves
+
+        x = torch.cat((poke_x, opp_poke_x, weather, ally_move_x, opp_move_x, x[:, :, opp_move_delts:]), dim=-1)
+        #ic(x.shape)
         x = self.net(x)
-        #print(x.shape)
+        
         return x.squeeze(0)
     
-
-
-def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_size: int = 256):
-    """Simple Multi-Layer Perceptron network."""
-    # first n are embedding layers
-
-
-    network = nn.Sequential(
-        nn.Linear(input_shape[0], hidden_size),
-        nn.ReLU(),
-        nn.Linear(hidden_size, hidden_size),
-        nn.ReLU(),
-        nn.Linear(hidden_size, n_actions),
-    )
-
-    return network
-
 
 class ActorCategorical(nn.Module):
     """Policy network, for discrete action spaces, which returns a distribution and an action given an
@@ -202,9 +421,11 @@ class PPOLightning(pl.LightningModule):
         lam: float = 0.95,
         lr_actor: float = 3e-4,
         lr_critic: float = 1e-3,
-        max_episode_len: float = 200,
+        max_episode_len: float = 100,
         batch_size: int = 512,
-        steps_per_epoch: int = 8192,
+        #batch_size: int = 1024,
+        steps_per_epoch: int = 4096, # increased due to randomness of pokes
+        #steps_per_epoch: int = 8192, # increased due to randomness of pokes
         nb_optim_iters: int = 4,
         clip_ratio: float = 0.2,
         **kwargs,
@@ -281,6 +502,10 @@ class PPOLightning(pl.LightningModule):
         self.avg_ep_reward = 0
         self.avg_ep_len = 0
         self.avg_reward = 0
+
+        self.games_played = 0
+        self.n_wins = 0
+        self.n_battles = 0
 
         #state_ints, state_floats = self.env.reset()
         #self.state = torch.FloatTensor(state_floats), torch.IntTensor(state_ints)
@@ -365,6 +590,7 @@ class PPOLightning(pl.LightningModule):
             terminal = len(self.ep_rewards) == self.max_episode_len
 
             if epoch_end or done or terminal:
+                self.games_played += 1
                 # if trajectory ends abtruptly, boostrap value of next state
                 if (terminal or epoch_end) and not done:
                     self.state = self.state.to(device=self.device)
@@ -417,6 +643,33 @@ class PPOLightning(pl.LightningModule):
                 self.avg_ep_len = (self.steps_per_epoch - steps_before_cutoff) / nb_episodes
 
                 self.epoch_rewards.clear()
+
+    @property
+    def win_rate(self) -> float:
+        """
+        Returns the win rate of the agent in the given environment
+        Args:
+            env: gym environment
+        Returns:
+            win rate of agent in environment
+        """
+        rate = self.env.win_rate()
+
+    def on_epoch_end(self) -> None:
+        super().on_epoch_end()
+
+
+        wins_delta = self.env.n_won_battles - self.n_wins
+        battles_delta = self.env.n_finished_battles - self.n_battles
+
+        self.log("n_battles", self.env.n_finished_battles)
+        self.log("n_battles_per_epoch", battles_delta)
+        self.log("win_rate", wins_delta / battles_delta)
+
+        self.n_wins = self.env.n_won_battles
+        self.n_battles = self.env.n_finished_battles
+        # TODO does this break algorithm?
+
 
     def actor_loss(self, state, action, logp_old, qval, adv) -> torch.Tensor:
         pi, _ = self.actor(state)
