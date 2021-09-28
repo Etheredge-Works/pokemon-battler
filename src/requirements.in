@@ -19,3 +19,4 @@ pillow
 asyncio
 kedro[yaml]
 mlflow[s3]
+boto3

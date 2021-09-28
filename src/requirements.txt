@@ -45,6 +45,12 @@ black==21.5b1
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 bleach==4.1.0
     # via nbconvert
+boto3==1.18.49
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
+botocore==1.21.49
+    # via
+    #   boto3
+    #   s3transfer
 cachetools==4.2.2
     # via
     #   google-auth
@@ -194,7 +200,10 @@ jinja2==3.0.1
     #   nbconvert
     #   notebook
 jmespath==0.10.0
-    # via kedro
+    # via
+    #   boto3
+    #   botocore
+    #   kedro
 json5==0.9.6
     # via jupyterlab-server
 jsonschema==3.2.0
@@ -417,6 +426,7 @@ python-dateutil==2.8.2
     # via
     #   alembic
     #   arrow
+    #   botocore
     #   jupyter-client
     #   pandas
 python-editor==1.0.4
@@ -471,6 +481,8 @@ rope==0.19.0
     # via kedro
 rsa==4.7.2
     # via google-auth
+s3transfer==0.5.0
+    # via boto3
 scipy==1.7.1
     # via optuna
 send2trash==1.8.0
@@ -566,6 +578,7 @@ typing-extensions==3.7.4.3
     # via tensorflow
 urllib3==1.26.6
     # via
+    #   botocore
     #   requests
     #   requests-unixsocket
 wcwidth==0.2.5
