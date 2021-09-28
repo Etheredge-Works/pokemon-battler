@@ -8,8 +8,10 @@ absl-py==0.13.0
     # via
     #   tensorboard
     #   tensorflow
-alembic==1.7.1
-    # via optuna
+alembic==1.4.1
+    # via
+    #   mlflow
+    #   optuna
 anyconfig==0.10.1
     # via kedro
 anyio==3.3.1
@@ -61,13 +63,18 @@ click==7.1.2
     # via
     #   black
     #   cookiecutter
+    #   databricks-cli
+    #   flask
     #   kedro
     #   kedro-telemetry
+    #   mlflow
     #   pip-tools
 cliff==3.9.0
     # via optuna
 cloudpickle==1.6.0
-    # via gym
+    # via
+    #   gym
+    #   mlflow
 cmaes==0.8.2
     # via optuna
 cmd2==2.2.0
@@ -80,20 +87,29 @@ cookiecutter==1.7.3
     # via kedro
 coverage==5.5
     # via pytest-cov
+databricks-cli==0.15.0
+    # via mlflow
 debugpy==1.4.3
     # via ipykernel
 decorator==5.1.0
     # via ipython
 defusedxml==0.7.1
     # via nbconvert
+docker==5.0.2
+    # via mlflow
 dynaconf==3.1.5
     # via kedro
 entrypoints==0.3
     # via
     #   jupyterlab-server
+    #   mlflow
     #   nbconvert
 flake8==3.9.2
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
+flask==2.0.1
+    # via
+    #   mlflow
+    #   prometheus-flask-exporter
 flatbuffers==1.12
     # via tensorflow
 fsspec==2021.8.1
@@ -103,7 +119,9 @@ gast==0.4.0
 gitdb==4.0.7
     # via gitpython
 gitpython==3.1.18
-    # via kedro
+    # via
+    #   kedro
+    #   mlflow
 google-auth-oauthlib==0.4.6
     # via tensorboard
 google-auth==1.35.0
@@ -118,6 +136,8 @@ grpcio==1.40.0
     # via
     #   tensorboard
     #   tensorflow
+gunicorn==20.1.0
+    # via mlflow
 gym==0.19.0
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
@@ -128,8 +148,8 @@ idna==2.10
     # via
     #   anyio
     #   requests
-importlib-resources==5.2.2
-    # via alembic
+importlib-metadata==4.8.1
+    # via mlflow
 iniconfig==1.1.1
     # via pytest
 ipykernel==6.4.1
@@ -157,6 +177,8 @@ ipywidgets==7.6.5
     # via jupyter
 isort==5.9.3
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
+itsdangerous==2.0.1
+    # via flask
 jedi==0.18.0
     # via ipython
 jinja2-time==0.2.0
@@ -164,6 +186,7 @@ jinja2-time==0.2.0
 jinja2==3.0.1
     # via
     #   cookiecutter
+    #   flask
     #   jinja2-time
     #   jupyter-server
     #   jupyterlab
@@ -216,7 +239,7 @@ jupyterlab==3.1.12
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 kedro-telemetry==0.1.2
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
-kedro==0.17.5
+kedro[yaml]==0.17.5
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
     #   kedro-telemetry
@@ -240,6 +263,8 @@ mccabe==0.6.1
     # via flake8
 mistune==0.8.4
     # via nbconvert
+mlflow[s3]==1.20.2
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 mypy-extensions==0.4.3
     # via black
 nbclassic==0.3.1
@@ -274,8 +299,10 @@ numpy==1.19.5
     #   gym
     #   h5py
     #   keras-preprocessing
+    #   mlflow
     #   opt-einsum
     #   optuna
+    #   pandas
     #   poke-env
     #   scipy
     #   tensorboard
@@ -293,8 +320,13 @@ packaging==21.0
     #   bleach
     #   jupyterlab
     #   jupyterlab-server
+    #   mlflow
     #   optuna
     #   pytest
+pandas==1.3.3
+    # via
+    #   kedro
+    #   mlflow
 pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.2
@@ -327,12 +359,16 @@ prometheus-client==0.11.0
     # via
     #   jupyter-server
     #   notebook
+    #   prometheus-flask-exporter
+prometheus-flask-exporter==0.18.2
+    # via mlflow
 prompt-toolkit==3.0.20
     # via
     #   ipython
     #   jupyter-console
 protobuf==3.17.3
     # via
+    #   mlflow
     #   tensorboard
     #   tensorflow
 ptyprocess==0.7.0
@@ -379,19 +415,27 @@ pytest==6.2.5
     #   pytest-mock
 python-dateutil==2.8.2
     # via
+    #   alembic
     #   arrow
     #   jupyter-client
+    #   pandas
+python-editor==1.0.4
+    # via alembic
 python-json-logger==2.0.2
     # via kedro
 python-slugify==5.0.2
     # via cookiecutter
 pytz==2021.1
-    # via babel
+    # via
+    #   babel
+    #   mlflow
+    #   pandas
 pyyaml==5.4.1
     # via
     #   cliff
     #   kedro
     #   kedro-telemetry
+    #   mlflow
     #   optuna
 pyzmq==22.2.1
     # via
@@ -403,6 +447,8 @@ qtconsole==5.1.1
     # via jupyter
 qtpy==1.11.1
     # via qtconsole
+querystring-parser==1.2.4
+    # via mlflow
 regex==2021.8.28
     # via black
 requests-oauthlib==1.3.0
@@ -412,8 +458,11 @@ requests-unixsocket==0.2.0
 requests==2.25.1
     # via
     #   cookiecutter
+    #   databricks-cli
+    #   docker
     #   jupyterlab-server
     #   kedro-telemetry
+    #   mlflow
     #   poke-env
     #   requests-oauthlib
     #   requests-unixsocket
@@ -434,6 +483,7 @@ six==1.15.0
     #   astunparse
     #   bleach
     #   cookiecutter
+    #   databricks-cli
     #   google-auth
     #   google-pasta
     #   grpcio
@@ -441,6 +491,7 @@ six==1.15.0
     #   keras-preprocessing
     #   protobuf
     #   python-dateutil
+    #   querystring-parser
     #   tensorflow
 smmap==4.0.0
     # via gitdb
@@ -449,11 +500,16 @@ sniffio==1.2.0
 sqlalchemy==1.4.23
     # via
     #   alembic
+    #   mlflow
     #   optuna
+sqlparse==0.4.2
+    # via mlflow
 stevedore==3.4.0
     # via cliff
 tabulate==0.8.9
-    # via poke-env
+    # via
+    #   databricks-cli
+    #   poke-env
 tensorboard-data-server==0.6.1
     # via tensorboard
 tensorboard-plugin-wit==1.8.0
@@ -520,11 +576,15 @@ wcwidth==0.2.5
 webencodings==0.5.1
     # via bleach
 websocket-client==1.2.1
-    # via jupyter-server
+    # via
+    #   docker
+    #   jupyter-server
 websockets==10.0
     # via poke-env
 werkzeug==2.0.1
-    # via tensorboard
+    # via
+    #   flask
+    #   tensorboard
 wheel==0.36.2
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
@@ -536,7 +596,7 @@ widgetsnbextension==3.5.1
 wrapt==1.12.1
     # via tensorflow
 zipp==3.5.0
-    # via importlib-resources
+    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

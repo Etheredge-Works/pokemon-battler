@@ -18,3 +18,4 @@ poke-env
 pillow
 asyncio
 kedro[yaml]
+mlflow[s3]
