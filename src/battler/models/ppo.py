@@ -188,11 +188,12 @@ class PokeMLP(nn.Module):
         self.type2_embedding = self._type2_embedding
         self.ability_embedding = self._ability_embedding
         self.item_embedding = self._item_embedding
-        self.per_poke_net = self._per_poke_net
+        self.per_poke_net = deepcopy(self._per_poke_net)
         ic(self.per_poke_net)
-        self.opp_poke_net = self._opp_per_poke_net
+        self.opp_poke_net = deepcopy(self._opp_per_poke_net)
 
-        self.move_net = self._move_net
+        self.move_net = deepcopy(self._move_net)
+        self.opp_move_net = deepcopy(self._move_net)
         ic(self.move_net)
 
         # TODO param poke_net
@@ -303,7 +304,7 @@ class PokeMLP(nn.Module):
         ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
 
         opp_move_delts = ally_moves_delta + self.moves_range
-        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.move_net)
+        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.opp_move_net)
         #ic(opp_move_x.shape)
         opp_move_x = opp_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
         #ic(opp_move_x.shape)
@@ -506,6 +507,7 @@ class PPOLightning(pl.LightningModule):
         self.games_played = 0
         self.n_wins = 0
         self.n_battles = 0
+        self.best_win_rate = 0
 
         #state_ints, state_floats = self.env.reset()
         #self.state = torch.FloatTensor(state_floats), torch.IntTensor(state_ints)
@@ -644,31 +646,28 @@ class PPOLightning(pl.LightningModule):
 
                 self.epoch_rewards.clear()
 
-    @property
-    def win_rate(self) -> float:
-        """
-        Returns the win rate of the agent in the given environment
-        Args:
-            env: gym environment
-        Returns:
-            win rate of agent in environment
-        """
-        rate = self.env.win_rate()
-
+    
     def on_epoch_end(self) -> None:
         super().on_epoch_end()
 
 
         wins_delta = self.env.n_won_battles - self.n_wins
         battles_delta = self.env.n_finished_battles - self.n_battles
+        win_rate = wins_delta / battles_delta if battles_delta > 0 else 0
 
         self.log("n_battles", self.env.n_finished_battles)
         self.log("n_battles_per_epoch", battles_delta)
-        self.log("win_rate", wins_delta / battles_delta)
+        self.log("win_rate", win_rate)
 
         self.n_wins = self.env.n_won_battles
         self.n_battles = self.env.n_finished_battles
         # TODO does this break algorithm?
+
+        if win_rate > self.best_win_rate:
+            self.best_win_rate = win_rate
+            self.logger.experimental.mlflow.log_model(self.actor, "actor")
+            #mlflow.pytorch.log_model(self.actor, 'actor', )
+
 
 
     def actor_loss(self, state, action, logp_old, qval, adv) -> torch.Tensor:
