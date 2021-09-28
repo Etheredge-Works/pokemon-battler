@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn.modules.activation import ReLU
 from battler.utils.pokemon_embed import PokemonEmbed, MoveEmbed
 
 
@@ -56,6 +57,7 @@ class DQN(nn.Module):
             #self.conv
             # [batch_size, stack_size, obs_size]
             nn.Conv1d(stack_size, out_channels, kernel_size=1),
+            nn.ReLU(),
             nn.Flatten(),
         ]
 
