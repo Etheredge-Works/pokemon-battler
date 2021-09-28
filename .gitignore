@@ -160,4 +160,6 @@ lightning_logs/
 .vscode/
 old_lightning_logs/
 ppo_logs/
-.gitignore
+
+14/
+*dmp
