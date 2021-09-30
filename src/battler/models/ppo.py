@@ -39,6 +39,8 @@ from pl_examples import cli_lightning_logo
 from copy import deepcopy
 from icecream import ic
 from battler.utils.encoders.abilities import GEN8_POKEMON, GEN8_ABILITIES
+import random
+from collections import deque
 
 
 from poke_env.environment.weather import Weather
@@ -53,6 +55,7 @@ class PokemonNet(nn.Module):
         ability_embedding_dim: int = 6,
         item_embedding_dim: int = 10,
     ):
+        super().__init__()
         self.name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
         self.status_embedding = nn.Embedding(len(Status)+2, 2)
 
@@ -108,6 +111,22 @@ class PokemonNet(nn.Module):
         return poke_x
 
 
+from dataclasses import dataclass
+
+
+@dataclass
+class Embeddings:
+    weather_embedding = nn.Embedding((len(Weather)+2), 2)
+    name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
+    status_embedding = nn.Embedding(len(Status)+2, 2)
+    # used twice
+    type_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+    #_type2_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+    ability_embedding = nn.Embedding(272, 6)
+    # TODO verify dims
+    item_embedding = nn.Embedding(923, 10)
+
+
 class PokeMLP(nn.Module):
     #NUM_TYPES = ##6
     '''
@@ -122,21 +141,20 @@ class PokeMLP(nn.Module):
     31-36: pokemons items
 
     '''
-    _weather_embedding = nn.Embedding((len(Weather)+2), 2)
-
-    _name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
-    _status_embedding = nn.Embedding(len(Status)+2, 2)
-
+    _weather_embedding = nn.Embedding((len(Weather)+2), 4)
+    ic(_weather_embedding)
+    #ic(sum(_weather_embedding.parameters()))
+    _name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 16)
+    #ic(_name_embedding.parameters().numel())
+    _status_embedding = nn.Embedding(len(Status)+2, 8)
+    #ic(_status_embedding.parameters().numel())
     # used twice
-    _type1_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
+    _type1_embedding = nn.Embedding(len(PokemonType)+2, 12) # 1 higher for None
     _type2_embedding = _type1_embedding
     #_type2_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
-
-    _ability_embedding = nn.Embedding(272, 6)
+    _ability_embedding = nn.Embedding(272, 16)
     # TODO verify dims
-    _item_embedding = nn.Embedding(923, 10)
-    #num_poke_embeddings = (6*6)
-    #num_embeddings = (5*6*2) + 1
+    _item_embedding = nn.Embedding(923, 16)
 
     # TODO use layer input size here
     per_poke_enum_dim = \
@@ -154,31 +172,34 @@ class PokeMLP(nn.Module):
     poke_floats = 15
     per_poke_embedding_dim = per_poke_enum_dim + poke_floats
     #ic(per_poke_embedding_dim)
+    move_dim = 20
+    '''
     _per_poke_net = nn.Sequential(
         #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
-        nn.Linear(per_poke_embedding_dim, 256),
+        #nn.LazyLinear(per_poke_embedding_dim, 256),
+        nn.Linear(per_poke_embedding_dim, 128),
         nn.ReLU(),
-        nn.Linear(256, 128),
+        nn.Linear(128, 128),
         nn.ReLU(),
-        nn.Linear(128, 64),
-        nn.ReLU(),
+        nn.Linear(128, 128),
+        #nn.ReLU(),
     )
+
     #_opp_per_poke_net = deepcopy(_per_poke_net)
     _opp_per_poke_net = _per_poke_net
     # TODO test opp_poke_embedding_net = deepcopy(poke_embedding_net)
 
-    move_dim = 20
     _move_net = nn.Sequential(
-        nn.Linear((move_dim-1) + _type1_embedding.embedding_dim, 64),
+        nn.Linear((move_dim-1) + _type1_embedding.embedding_dim, 128),
         nn.ReLU(),
-        nn.Linear(64, 32),
+        nn.Linear(128, 128),
         nn.ReLU(),
-        nn.Linear(32, 8),
-        nn.ReLU(),
+        nn.Linear(128, 128),
     )
+    '''
 
 
-    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 256):
+    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 1024):
         super().__init__()
         # I'm not sure why +2. +1 is to account for None
         self.weather_embedding = self._weather_embedding
@@ -188,12 +209,34 @@ class PokeMLP(nn.Module):
         self.type2_embedding = self._type2_embedding
         self.ability_embedding = self._ability_embedding
         self.item_embedding = self._item_embedding
-        self.per_poke_net = deepcopy(self._per_poke_net)
+        self.per_poke_net = nn.Sequential(
+            #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
+            #nn.LazyLinear(256),
+            nn.Linear(self.per_poke_embedding_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            #nn.ReLU(),
+        )
+        
+        self.opp_poke_net = deepcopy(self.per_poke_net)
         ic(self.per_poke_net)
-        self.opp_poke_net = deepcopy(self._opp_per_poke_net)
+        #@self.opp_poke_net = deepcopy(self._opp_per_poke_net)
+        #self.opp_poke_net = self.per_poke_net
 
-        self.move_net = deepcopy(self._move_net)
-        self.opp_move_net = deepcopy(self._move_net)
+
+        #self.move_net = deepcopy(self._move_net)
+        self.move_net = nn.Sequential(
+            nn.Linear((self.move_dim-1) + self._type1_embedding.embedding_dim, 64),
+            #nn.LazyLinear(128),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+        )
+        #self.opp_move_net = deepcopy(self._move_net)
+        self.opp_move_net = deepcopy(self.move_net)
         ic(self.move_net)
 
         # TODO param poke_net
@@ -206,50 +249,76 @@ class PokeMLP(nn.Module):
         #poke_dims = self.per_poke_net.
         embedding_dim_delta =  post_converted_dims - pre_converted_dims
         ic(embedding_dim_delta)
-        conv_out_channels = 2
+        conv_out_channels = 4
 
         #ic(input_shape)
         moves_flattened_dim = 6 * 4 * 8 * 2
         moves_dim_delta = moves_flattened_dim - (self.move_dim*12*4) - 1
         frame_dim = input_shape[1] + embedding_dim_delta + moves_dim_delta
+        frame_dim = 2515
         net_input_dim = (input_shape[1] + embedding_dim_delta) * conv_out_channels
+        net_input_dim = 2515 * 2
         ic(net_input_dim) # shoudl be 576
         # TODO keep testing reflex agents
         # TODO the agent does seem to behave differently based on previous attacks
+        # TODO active poke net and other poke net
         self.net = nn.Sequential(
+            nn.Flatten(),
+            nn.LazyLinear(1024),
+            nn.LeakyReLU(),
+            nn.LazyLinear(1024),
+            nn.LeakyReLU(),
+            nn.LazyLinear(1024),
+            nn.LeakyReLU(),
+            nn.LazyLinear(1024),
+            nn.LeakyReLU(),
             # Shuffle inforation across frame
-            nn.Conv1d(input_shape[0], 32, kernel_size=1),
+            #nn.Conv1d(input_shape[0], 64, kernel_size=1),
             #nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.Conv1d(32, 16, kernel_size=1),
-            #nn.BatchNorm1d(16),
-            nn.ReLU(),
-            nn.Conv1d(16, 8, kernel_size=1),
-            #nn.BatchNorm1d(8),
-            nn.ReLU(),
+            #nn.ReLU(),
+            #nn.ReLU(),
+            #nn.Conv1d(64, 64, kernel_size=1),
+            #nn.BatchNorm1d(64),
+            #nn.ReLU(),
+            #nn.Linear(3103, 512),
+            #nn.LazyLinear(1024),
+            #nn.Conv1d(64, 64, kernel_size=1),
+            #nn.BatchNorm1d(64),
+            #nn.ReLU(),
+            #nn.Linear(512, 256),
+            #nn.Linear(frame_dim, frame_dim//2),
+            #nn.LazyLinear(512),
+            #nn.ReLU(),
 
             # Shuffle inforation inside frame
-            nn.Linear(frame_dim, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            #nn.Linear(frame_dim, frame_dim//2),
+            #nn.Linear(hidden_size, hidden_size),
+            #nn.ReLU(),
 
-            nn.Conv1d(8, conv_out_channels, kernel_size=1),
+            #nn.Conv1d(64, 64, kernel_size=1),
             # TODO make sure using eval mode other places if using batchnorm? not used elsewhere
-            #nn.BatchNorm1d(conv_out_channels),
-            nn.ReLU(),
-            nn.Flatten(),
+            #nn.BatchNorm1d(64),
+            #nn.ReLU(),
+            #nn.AdaptiveAvgPool1d(64),
+            #nn.Flatten(),
             #nn.Linear(net_input_dim, hidden_size),
-            nn.Linear(hidden_size*conv_out_channels, hidden_size),
+            #nn.Linear(hidden_size*conv_out_channels, hidden_size),
+            #nn.Linear(hidden_size*conv_out_channels, hidden_size),
+            #nn.LazyLinear(hidden_size),
             #nn.Dropout(0.2),
             #nn.Linear(net_input_dim//conv_out_channels, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, n_actions),
+            #nn.ReLU(),
+            #nn.Linear(hidden_size, hidden_size),
+            #nn.LazyLinear(hidden_size),
+            #nn.ReLU(),
+            nn.LazyLinear(n_actions),
         )
         ic(self.net)
         self.moves_range = self.move_dim * 4 * 6 
+
+        #net_input_dim = (input_shape[0] * input_shape[1])
+        #net_input_dim = 10
+
 
     def move_forward(self, x, net):
         moves_raw = x[:, : , :self.moves_range].view(*x.shape[0:2], 6, 4, self.move_dim)
@@ -260,9 +329,10 @@ class PokeMLP(nn.Module):
         #ic(type_x.shape)
         x = torch.cat((moves_raw[:, :, :, :, 1:], type_x), dim=-1)
         #ic(x.shape)
+        return x
         y = net(x)
-        #ic(y.shape)
         return y
+        #ic(y.shape)
 
 
     def poke_forward(self, x, net):
@@ -279,19 +349,38 @@ class PokeMLP(nn.Module):
 
         poke_x = torch.cat([pokes, names, status, type1, type2, ability, item], dim=-1)
 
-        poke_x = net(poke_x)
+        #poke_x = net(poke_x)
         poke_x = poke_x.view(x_ints.shape[0], x_ints.shape[1], -1)
         return poke_x
     
     def forward(self, x):
+        if len(x.shape) == 4:
+            # Needed because it one time gets 512x1x.x.
+            x.squeeze_(1)
+        elif len(x.shape) < 3:
+            x.unsqueeze_(0)
+
+        #weather_data = x[:, :, 0]
+        #ic(weather_data.shape)
+        #ally_pokemon_data = x[:, :, 1:127].view(x.shape[0], x.shape[1], 6, 21)
+        #ic(ally_pokemon_data.shape)
+
+
+        #weather = self.weather_embedding(x[:, :, 0:1])
+        #type_idx = [
+            #*list(range(13, 25)), 
+            #*list(range(12+127, 24+127)),
+            #254, 274, 294, 114, 
+        #]
+        #ic(type_idx)
+
+
+
+        # better way below ######
 
         #ic()
         #ic(x.shape)
         #print(f"input: {x.shape}")
-        if len(x.shape) == 4:
-            x.squeeze_(1)
-        elif len(x.shape) < 3:
-            x.unsqueeze_(0)
 
         x_ints = torch.round(x[:, :, :1]).long()
 
@@ -299,6 +388,7 @@ class PokeMLP(nn.Module):
 
 
         ally_moves_delta = 254 + self.moves_range
+        #ic(ally_moves_delta)
         ally_move_x = self.move_forward(x[:, :, 254:ally_moves_delta], self.move_net)
         #ic(ally_move_x.shape)
         ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
@@ -319,6 +409,7 @@ class PokeMLP(nn.Module):
 
         x = torch.cat((poke_x, opp_poke_x, weather, ally_move_x, opp_move_x, x[:, :, opp_move_delts:]), dim=-1)
         #ic(x.shape)
+
         x = self.net(x)
         
         return x.squeeze(0)
@@ -418,6 +509,8 @@ class PPOLightning(pl.LightningModule):
     def __init__(
         self,
         env: str,
+        env_kwargs: dict = None,
+        raw_env = None,
         gamma: float = 0.99,
         lam: float = 0.95,
         lr_actor: float = 3e-4,
@@ -429,6 +522,8 @@ class PPOLightning(pl.LightningModule):
         #steps_per_epoch: int = 8192, # increased due to randomness of pokes
         nb_optim_iters: int = 4,
         clip_ratio: float = 0.2,
+        n_policies: int = 100,
+        policy_update_threshold: float = 0.6,
         **kwargs,
     ) -> None:
         """
@@ -445,6 +540,8 @@ class PPOLightning(pl.LightningModule):
             clip_ratio: hyperparameter for clipping in the policy objective
         """
         super().__init__()
+        #env_kwargs = env_kwargs or {}
+        env_kwargs = env_kwargs if env_kwargs is not None else {}
 
         # Hyperparameters
         self.lr_actor = lr_actor
@@ -456,7 +553,10 @@ class PPOLightning(pl.LightningModule):
         self.lam = lam
         self.max_episode_len = max_episode_len
         self.clip_ratio = clip_ratio
+        self.n_policies = n_policies
+        self.policy_update_threshold = policy_update_threshold
         self.save_hyperparameters(
+            "env",
             "lr_actor",
             "lr_critic",
             "steps_per_epoch",
@@ -466,9 +566,16 @@ class PPOLightning(pl.LightningModule):
             "lam",
             "max_episode_len",
             "clip_ratio",
+            "n_policies",
+            "policy_update_threshold",
         )
 
-        self.env = env
+        self.env = gym.make(env, **env_kwargs)
+        #self.env.__init__(**env_kwargs)
+        #self.env = raw_env
+        ic(self.env)
+        self.player_id = self.env.username
+        self.save_hyperparameters(dict(player_id=self.player_id))
         print(self.env.observation_space)
         # value network
         self.critic = PokeMLP(self.env.observation_space.shape, 1)
@@ -512,6 +619,11 @@ class PPOLightning(pl.LightningModule):
         #state_ints, state_floats = self.env.reset()
         #self.state = torch.FloatTensor(state_floats), torch.IntTensor(state_ints)
         self.state = torch.FloatTensor(self.env.reset())
+
+        self.policy_bank = deque(maxlen=self.n_policies)
+        self.actor_bank = deque(maxlen=self.n_policies)
+        self.n_policies_pushed = 0
+        #self.policy_bank.append(self.build_policy(self.actor))
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Passes in a state x through the network and returns the policy and a sampled action.
@@ -614,8 +726,10 @@ class PPOLightning(pl.LightningModule):
                 self.ep_rewards = []
                 self.ep_values = []
                 self.episode_step = 0
+                self.update_opponent()
                 self.state = torch.FloatTensor(self.env.reset())
 
+            # TODO time
             if epoch_end:
                 train_data = zip(
                     self.batch_states, self.batch_actions, self.batch_logp, self.batch_qvals, self.batch_adv
@@ -646,6 +760,35 @@ class PPOLightning(pl.LightningModule):
 
                 self.epoch_rewards.clear()
 
+    def build_policy(self, net, device='cpu'):
+        """
+        Builds a policy from a given network
+        Args:
+            net: network to build policy from
+        Returns:
+            policy
+        """
+
+        net = deepcopy(net).to(device=self.device)
+        net.eval()
+        def policy(state):
+            with torch.no_grad():
+                state = torch.FloatTensor(state).to(device=self.device)
+                pi, action = net(state)
+                return action.cpu().item()
+
+        return policy
+
+    def update_opponent(self):
+        """
+        Update the opponent's policy to match the current policy
+        """
+        # TODO should this be here?
+        if len(self.actor_bank) > 0:
+            #self.policy_bank.append(self.build_policy(self.actor))
+            #self.n_policies_pushed += 1
+            actor = random.choice(self.actor_bank)
+            self.env.set_opponent_policy(self.build_policy(actor))
     
     def on_epoch_end(self) -> None:
         super().on_epoch_end()
@@ -658,16 +801,36 @@ class PPOLightning(pl.LightningModule):
         self.log("n_battles", self.env.n_finished_battles)
         self.log("n_battles_per_epoch", battles_delta)
         self.log("win_rate", win_rate)
+        self.log("n_policies_pushed", self.n_policies_pushed)
 
         self.n_wins = self.env.n_won_battles
         self.n_battles = self.env.n_finished_battles
         # TODO does this break algorithm?
 
+        # TODO really should evaluate agent against old agent instead of this way
+        # TODO but this way does make sure agent doesn't overfit and stays
+        #      in the same performance relative to old policies
+        self.log("n_old_actors", len(self.actor_bank))
+        if win_rate > self.policy_update_threshold:
+            self.actor_bank.append(deepcopy(self.actor).cpu())
+            self.n_policies_pushed += 1
+
         if win_rate > self.best_win_rate:
+            # not really useful
             self.best_win_rate = win_rate
-            self.logger.experimental.mlflow.log_model(self.actor, "actor")
+            self.log("best_win_rate", self.best_win_rate)
+
+            #mlflow.pytorch.log_model(self.actor, "actor", run_id=self.logger.run_id)
+            #self.logger.experiment.
             #mlflow.pytorch.log_model(self.actor, 'actor', )
 
+
+    def fight_max(self):
+        def max_p(battle):
+            if battle.available_actions:
+                best_move = max(battle.available_actions, key=lambda a: a.base_power)
+                return self.create_order(best_move)
+        #self.env.set_opponent_policy(l())
 
 
     def actor_loss(self, state, action, logp_old, qval, adv) -> torch.Tensor:
@@ -703,7 +866,7 @@ class PPOLightning(pl.LightningModule):
 
         if optimizer_idx == 0:
             loss_actor = self.actor_loss(state, action, old_logp, qval, adv)
-            self.log("loss_actor", loss_actor, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log("loss_actor", loss_actor, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
             return loss_actor
 

@@ -38,7 +38,8 @@ def embed_pokemon_moves(mon: Pokemon) -> np.ndarray:
     #ic(mon.moves)
     for i, m in enumerate(mon.moves.values()):
         if i > 3:
-            ic(mon.moves)
+            #ic(mon.moves)
+            pass
         else:
             moves[i] = embed_move(m)
         # TODO why does there sometimes get four moves?

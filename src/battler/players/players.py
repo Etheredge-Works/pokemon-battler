@@ -73,13 +73,18 @@ class MaxDamagePlayer(RandomPlayer):
         else:
             return self.choose_random_move(battle)
 
-
+import gym
+gym.register(
+    id='Pokemon-v8',
+    entry_point='battler.players.players:RLPlayer',
+    max_episode_steps=1000,
+    nondeterministic=True,
+)
 class RLPlayer(Gen8EnvSinglePlayer):
     def __init__(
         self, 
         reward_kwargs: Dict = {},
         obs_space: int = 1,
-        action_space: int = 17, # gen 7
         stack_size: int = 1,
         # TODO kwargs these things
         #fainted_value: float = 0.0,
@@ -90,6 +95,7 @@ class RLPlayer(Gen8EnvSinglePlayer):
         #victory_value: float = 1.0,
         **kwargs,
     ):
+        print(kwargs)
         super().__init__(**kwargs)
         self.obs_space = obs_space
         self._action_space = spaces.Discrete(len(self._ACTION_SPACE))
@@ -124,9 +130,14 @@ class RLPlayer(Gen8EnvSinglePlayer):
         return super().reset()
 
     def compute_reward(self, battle: Battle) -> float:
-        #return self.reward_computing_helper(
-            #battle,
-        #)
+        return self.reward_computing_helper(
+            battle,
+            #victory_value=30,
+            #fainted_value=-2,
+            #hp_value=2,
+            #status_value=0.5
+            
+        )
         starting_value = 0
         number_of_pokemons = 6
 

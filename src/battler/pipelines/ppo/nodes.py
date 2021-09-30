@@ -5,10 +5,13 @@ from battler.models.ppo import PPOLightning
 from battler.players.players import RLPlayer, MaxDamagePlayer
 from pytorch_lightning import Trainer
 import pytorch_lightning as pl
+import random
+import string
+from poke_env.player_configuration import PlayerConfiguration
 
 
 def train_wrapper(
-    env, opponent, other
+    env_name, other, kwargs, env
 ):
     trainer = Trainer(
         gpus=1,
@@ -27,11 +30,12 @@ def train_wrapper(
             #name='ppo_logs',
         #)
     )
-    model = PPOLightning(env)
+    model = PPOLightning(env_name, env_kwargs=kwargs, raw_env=env)
     trainer.fit(model)
     other['model'] = model
     other['trainer'] = trainer
 
+from poke_env.player.env_player import DummyPlayer
 # TODO use attention and pad moves
 # TODO trainer kwargs
 def train(
@@ -44,27 +48,36 @@ def train(
     model_path: str,
 ) -> Dict:
 
-    opp = MaxDamagePlayer(battle_format=battle_format)
-    #opp = RandomPlayer(battle_format=battle_format)
+    random_string = ''.join(random.choice(string.ascii_letters) for _ in range(4))
+    #opp = MaxDamagePlayer(
+    opp = DummyPlayer(
+        #player_configuration=PlayerConfiguration(f"MaxDamagePlayer {random_string}", None),
+        battle_format=battle_format
+    )
+
     train_kwargs = dict(
         #model=None,
         #trainer=None,
-        opponent=opp,
         other = {}
     )
 
     # TODO change eval to challange existing players by id
-    env_player = RLPlayer(
+    #random_string = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+    env_kwargs = dict(
+        # TODO why does passing player configuration result in "no battles"?
+        #player_configuration=PlayerConfiguration(f"RLPlayer {random_string}", None),
         battle_format=battle_format, 
         reward_kwargs=reward_kwargs,
         obs_space=lightning_kwargs['obs_space'],
         stack_size=lightning_kwargs['stack_size'],)
-
-    env_player.play_against(
-        env_algorithm=train_wrapper,
-        opponent=opp,
-        env_algorithm_kwargs=train_kwargs
-    )
+    env = RLPlayer(**env_kwargs)
+    print("Training...")
+    train_wrapper(env_name="Pokemon-v8", other={}, kwargs=env_kwargs, env=env)
+    #3env_player.play_against(
+        #env_algorithm=train_wrapper,
+        #opponent=opp,
+        #env_algorithm_kwargs=train_kwargs
+    #)
 
     #trainer.save_checkpoint(model_path)
     #pr.disable()
@@ -80,3 +93,9 @@ def train(
         #model_kwargs=model.net.get_kwargs(),
         #model_path=model_path
     #)
+
+def blesser():
+    """
+    Gets all staged models and the current production model and has them duke it out
+    best one gets moved to deployment. The rest go archive.
+    """
