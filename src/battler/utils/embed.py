@@ -51,7 +51,7 @@ def embed_move(move: Move) -> np.ndarray:
     # TODO move to embed pokemon
     if move is None:
         data = np.zeros(20)
-        data[1] = -1
+        #data[1] = -1
     else:
         does_boost = move.boosts is not None
         # TODO steals boosts
@@ -168,7 +168,7 @@ def embed_pokemon(pokemon: Pokemon) -> np.ndarray:
             float(pokemon.must_recharge),  # TODO remove
             #float(pokemon.preparing), TODO why tuple?
             float(pokemon.revealed),
-            pokemon.status_counter / 6.,
+            pokemon.status_counter / 6., # TODO some history here
             #float(pokemon.weight),
             pokemon.level / 100.
         ])
@@ -273,16 +273,27 @@ def embed_battle(battle: Battle) -> np.ndarray:
     weather = enum_weather(battle.weather)
 
     # lines up all the types and abilities and items
-    #moves_vector = embed_moves(battle)
-    poke_encodes = np.array([embed_pokemon(pokemon) for pokemon in battle.team.values()])
+    ally_team = sorted(
+        battle.team.values(), 
+        # active first, fainted last, species next
+        key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
+    )
+    poke_encodes = np.array([embed_pokemon(mon) for mon in ally_team])
+    # TODO by putting active mon first, could also drop active indicator.
+    # TODO this also frees up the next to think differnetly in differnt layers
+    # TODO the other poke layers can think differently 
 
-    #print("==============")
-    opp_poke_encodes = np.array([embed_pokemon(pokemon) for pokemon in battle.opponent_team.values()])
+    opp_team = sorted(
+        battle.opponent_team.values(), 
+        key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
+    )
 
-    poke_moves = np.array([embed_pokemon_moves(pokemon) for pokemon in battle.team.values()])
+    opp_poke_encodes = np.array([embed_pokemon(mon) for mon in opp_team])
+
+    poke_moves = np.array([embed_pokemon_moves(pokemon) for pokemon in ally_team])
     #ic(poke_moves.shape)
 
-    opp_poke_moves = np.array([embed_pokemon_moves(pokemon) for pokemon in battle.opponent_team.values()])
+    opp_poke_moves = np.array([embed_pokemon_moves(pokemon) for pokemon in opp_team])
     missing_axis = 6 - opp_poke_moves.shape[0]
     #ic(opp_poke_moves.shape)
     opp_poke_moves = np.concatenate([opp_poke_moves, np.zeros((missing_axis, *poke_moves.shape[1:]))]) #TODO is -1 better?
@@ -311,6 +322,8 @@ def embed_battle(battle: Battle) -> np.ndarray:
     remaining_mon_opponent = (
         len([mon for mon in battle.opponent_team.values() if not mon.fainted]) / 6
     )
+    # TODO should dead pokes be ignored? is there anything to gain form thier info?
+    # TODO attention to only active pokes?
 
     #levels = np.array([mon.level for mon in battle.team.values()]) / 100.
     #opp_levels = [mon.level for mon in battle.active_pokemon]

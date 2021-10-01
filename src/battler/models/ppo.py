@@ -114,6 +114,7 @@ class PokemonNet(nn.Module):
 from dataclasses import dataclass
 
 
+# TODO move to passing in embeddings
 @dataclass
 class Embeddings:
     weather_embedding = nn.Embedding((len(Weather)+2), 2)
@@ -199,7 +200,7 @@ class PokeMLP(nn.Module):
     '''
 
 
-    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 1024):
+    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_dim: int = 1024):
         super().__init__()
         # I'm not sure why +2. +1 is to account for None
         self.weather_embedding = self._weather_embedding
@@ -209,6 +210,7 @@ class PokeMLP(nn.Module):
         self.type2_embedding = self._type2_embedding
         self.ability_embedding = self._ability_embedding
         self.item_embedding = self._item_embedding
+        '''
         self.per_poke_net = nn.Sequential(
             #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
             #nn.LazyLinear(256),
@@ -259,19 +261,22 @@ class PokeMLP(nn.Module):
         net_input_dim = (input_shape[1] + embedding_dim_delta) * conv_out_channels
         net_input_dim = 2515 * 2
         ic(net_input_dim) # shoudl be 576
+        '''
         # TODO keep testing reflex agents
         # TODO the agent does seem to behave differently based on previous attacks
         # TODO active poke net and other poke net
         self.net = nn.Sequential(
+            #nn.Conv1d(input_shape[0], 64, kernel_size=1),
+            #nn.BatchNorm1d(32),
             nn.Flatten(),
-            nn.LazyLinear(1024),
+            nn.LazyLinear(hidden_dim),
             nn.LeakyReLU(),
-            nn.LazyLinear(1024),
+            nn.LazyLinear(hidden_dim),
             nn.LeakyReLU(),
-            nn.LazyLinear(1024),
-            nn.LeakyReLU(),
-            nn.LazyLinear(1024),
-            nn.LeakyReLU(),
+            #nn.LazyLinear(hidden_dim),
+            #nn.LeakyReLU(),
+            #nn.LazyLinear(hidden_dim),
+            #nn.LeakyReLU(),
             # Shuffle inforation across frame
             #nn.Conv1d(input_shape[0], 64, kernel_size=1),
             #nn.BatchNorm1d(32),
@@ -315,6 +320,13 @@ class PokeMLP(nn.Module):
         )
         ic(self.net)
         self.moves_range = self.move_dim * 4 * 6 
+
+        self.per_poke_net = None
+        self.opp_poke_net = None
+
+        self.opp_move_net = None
+        self.move_net = None
+        self.opp_move_net = None
 
         #net_input_dim = (input_shape[0] * input_shape[1])
         #net_input_dim = 10
@@ -394,6 +406,7 @@ class PokeMLP(nn.Module):
         ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
 
         opp_move_delts = ally_moves_delta + self.moves_range
+        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.opp_move_net)
         opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.opp_move_net)
         #ic(opp_move_x.shape)
         opp_move_x = opp_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
@@ -508,9 +521,9 @@ class PPOLightning(pl.LightningModule):
 
     def __init__(
         self,
-        env: str,
+        env_name: str,
         env_kwargs: dict = None,
-        raw_env = None,
+        net_kwargs: dict = None,
         gamma: float = 0.99,
         lam: float = 0.95,
         lr_actor: float = 3e-4,
@@ -541,7 +554,10 @@ class PPOLightning(pl.LightningModule):
         """
         super().__init__()
         #env_kwargs = env_kwargs or {}
+
+        # TODO separate networks for active pokemon? is hat not already what it's doing?
         env_kwargs = env_kwargs if env_kwargs is not None else {}
+        net_kwargs = net_kwargs if net_kwargs is not None else {}
 
         # Hyperparameters
         self.lr_actor = lr_actor
@@ -555,39 +571,24 @@ class PPOLightning(pl.LightningModule):
         self.clip_ratio = clip_ratio
         self.n_policies = n_policies
         self.policy_update_threshold = policy_update_threshold
-        self.save_hyperparameters(
-            "env",
-            "lr_actor",
-            "lr_critic",
-            "steps_per_epoch",
-            "nb_optim_iters",
-            "batch_size",
-            "gamma",
-            "lam",
-            "max_episode_len",
-            "clip_ratio",
-            "n_policies",
-            "policy_update_threshold",
-        )
+        self.env = gym.make(env_name, **env_kwargs)
 
-        self.env = gym.make(env, **env_kwargs)
-        #self.env.__init__(**env_kwargs)
-        #self.env = raw_env
-        ic(self.env)
+        self.save_hyperparameters()
+
         self.player_id = self.env.username
         self.save_hyperparameters(dict(player_id=self.player_id))
-        print(self.env.observation_space)
+
         # value network
-        self.critic = PokeMLP(self.env.observation_space.shape, 1)
-        #self.critic = create_mlp(self.env.observation_space.shape, 1)
+        self.critic = PokeMLP(self.env.observation_space.shape, 1, **net_kwargs)
+
         # policy network (agent)
         if isinstance(self.env.action_space, gym.spaces.box.Box):
             act_dim = self.env.action_space.shape[0]
-            actor_mlp = PokeMLP(self.env.observation_space.shape, act_dim)
+            actor_mlp = PokeMLP(self.env.observation_space.shape, act_dim, **net_kwargs)
             #actor_mlp = create_mlp(self.env.observation_space.shape, act_dim)
             self.actor = ActorContinous(actor_mlp, act_dim)
         elif isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
-            actor_mlp = PokeMLP(self.env.observation_space.shape, self.env.action_space.n)
+            actor_mlp = PokeMLP(self.env.observation_space.shape, self.env.action_space.n, **net_kwargs)
             #actor_mlp = create_mlp(self.env.observation_space.shape, self.env.action_space.n)
             self.actor = ActorCategorical(actor_mlp)
         else:
@@ -620,7 +621,6 @@ class PPOLightning(pl.LightningModule):
         #self.state = torch.FloatTensor(state_floats), torch.IntTensor(state_ints)
         self.state = torch.FloatTensor(self.env.reset())
 
-        self.policy_bank = deque(maxlen=self.n_policies)
         self.actor_bank = deque(maxlen=self.n_policies)
         self.n_policies_pushed = 0
         #self.policy_bank.append(self.build_policy(self.actor))
@@ -785,8 +785,6 @@ class PPOLightning(pl.LightningModule):
         """
         # TODO should this be here?
         if len(self.actor_bank) > 0:
-            #self.policy_bank.append(self.build_policy(self.actor))
-            #self.n_policies_pushed += 1
             actor = random.choice(self.actor_bank)
             self.env.set_opponent_policy(self.build_policy(actor))
     
@@ -801,7 +799,6 @@ class PPOLightning(pl.LightningModule):
         self.log("n_battles", self.env.n_finished_battles)
         self.log("n_battles_per_epoch", battles_delta)
         self.log("win_rate", win_rate)
-        self.log("n_policies_pushed", self.n_policies_pushed)
 
         self.n_wins = self.env.n_won_battles
         self.n_battles = self.env.n_finished_battles
@@ -813,7 +810,6 @@ class PPOLightning(pl.LightningModule):
         self.log("n_old_actors", len(self.actor_bank))
         if win_rate > self.policy_update_threshold:
             self.actor_bank.append(deepcopy(self.actor).cpu())
-            self.n_policies_pushed += 1
 
         if win_rate > self.best_win_rate:
             # not really useful

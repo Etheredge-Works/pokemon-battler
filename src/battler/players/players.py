@@ -83,36 +83,21 @@ gym.register(
 class RLPlayer(Gen8EnvSinglePlayer):
     def __init__(
         self, 
-        reward_kwargs: Dict = {},
+        reward_kwargs: Dict = None,
         obs_space: int = 1,
         stack_size: int = 1,
-        # TODO kwargs these things
-        #fainted_value: float = 0.0,
-        #hp_value: float = 0.0,
-        #number_of_pokemons: int = 6,
-        #starting_value: float = 0.0,
-        #status_value: float = 0.0,
-        #victory_value: float = 1.0,
         **kwargs,
     ):
-        print(kwargs)
         super().__init__(**kwargs)
+
         self.obs_space = obs_space
         self._action_space = spaces.Discrete(len(self._ACTION_SPACE))
-        #self._action_space = spaces.Discrete(action_space)
-        #self.fainted_value = fainted_value
-        #self.hp_value = hp_value
-        #self.number_of_pokemons = number_of_pokemons
-        #self.starting_value = starting_value
-        #self.status_value = status_value
-        #self.victory_value = victory_value
-        self.reward_kwargs = reward_kwargs
+
+        self.reward_kwargs = reward_kwargs or {}
         self.state = None
         self.stack_size = stack_size
         self._observation_space = spaces.Box(
             float("-inf"), float("inf"), shape=(stack_size, self.obs_space,))
-            #float("-inf"), float("inf"), shape=(self.stack_size * self.obs_space,))
-            #kfloat("-inf"), float("inf"), shape=(self.stack_size, self.obs_space,))
         
     @property
     def observation_space(self) -> np.array:
@@ -132,6 +117,7 @@ class RLPlayer(Gen8EnvSinglePlayer):
     def compute_reward(self, battle: Battle) -> float:
         return self.reward_computing_helper(
             battle,
+            **self.reward_kwargs,
             #victory_value=30,
             #fainted_value=-2,
             #hp_value=2,
@@ -206,3 +192,17 @@ class RLPlayer(Gen8EnvSinglePlayer):
 
         return super().play_against(opponent, battle)
     '''
+
+#class VectorPlayer(gym.ObservationWrapper):
+    #def __init__(self, env: gym.Env, n_obs: int = 1, **kwargs):
+
+#class VectorizedPlayer(gym.vector.VectorEnv):
+class VectorizedPlayer(gym.Env):
+    def __init__(self, env_name: str, n_obs: int = 1, **kwargs):
+        super().__init__()
+
+        self.envs = [gym.make(env_name) for _ in range(n_obs)]
+        self.n_obs = n_obs
+        self.observation_space = spaces.Box(
+            float("-inf"), float("inf"), shape=(n_obs, self..shape[0]))
+        

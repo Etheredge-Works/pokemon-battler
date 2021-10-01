@@ -14,13 +14,9 @@ def create_pipeline(**kwargs):
         node(
             train, 
             inputs=dict(
-                battle_format="params:battle_format",
                 #opponent_type="params:train_opponent",
-                lightning_kwargs="params:lightning_kwargs",
+                lightning_kwargs="params:ppo_lightning_kwargs",
                 epochs="params:epochs",
-                model_path="params:checkpoint_path",
-                reward_kwargs="params:rl_player_kwargs",
-                net_kwargs="params:dqn_kwargs",
             ),
             outputs=None,
             #outputs=dict(
