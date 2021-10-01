@@ -18,5 +18,12 @@ poke-env
 pillow
 asyncio
 kedro[yaml]
-mlflow[s3]
+mlflow
 boto3
+torch==1.9.1+cu111 
+torchvision==0.10.1+cu111 
+torchaudio==0.9.1 
+-f https://download.pytorch.org/whl/torch_stable.html
+pytorch-lightning
+icecream
+scikit-learn 

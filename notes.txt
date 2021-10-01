@@ -49,3 +49,8 @@ start new opponent on process and keep link to their id for chalange
 when popping off, shut dwon that process
 
 gym can add environment to register environment
+
+What is s term for shared lower layers?
+
+sorted pokemon by active and fainted seems to helped the network be smaller
+it's learning so much more

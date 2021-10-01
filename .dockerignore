@@ -26,3 +26,7 @@ results
 !notebooks/.gitkeep
 !references/.gitkeep
 !results/.gitkeep
+
+ppo_logs/
+lightning_logs/
+14/

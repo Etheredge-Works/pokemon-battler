@@ -22,15 +22,25 @@ services:
     command: ["python", "src/battler/deploy/dqn_player.py"]
 
   train-ppo:
-    build: .
+    build: 
+      context: .
+      dockerfile: train.Dockerfile
     environment: 
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL}
-      MLFOW_TRACKING_URI: ${MLFOW_TRACKING_URI}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
       MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME}
       MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD}
-    volumes:
-      - .:/app
+    network_mode: "host"
+    #volumes:
+      #- .:/app
     working_dir: /app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     command: ["kedro", "run", "--pipeline", "ppo"]
