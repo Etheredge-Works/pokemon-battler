@@ -39,10 +39,11 @@ ppo_lightning_kwargs:
     policy_update_threshold: 0.6
 
     net_kwargs:
-        hidden_dim: 512
+        hidden_dim: 256
+        num_dense_layers: 2
 
     env_kwargs:
-        stack_size: 16
+        stack_size: 64
         obs_space: 1289
         battle_format: gen8randombattle
         reward_kwargs:
