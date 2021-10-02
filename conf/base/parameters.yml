@@ -55,9 +55,13 @@ ppo_lightning_kwargs:
             status_value: 0.2
             victory_value: 6.
 
-train_opponent: self
-obs_space: 110
-n_battles: 400
+trainer_kwargs:
+  gpus: 1
+  accelerator: 'dp'
+  max_epochs: 10000
+  flush_logs_every_n_steps: 4000
+
+
 blessing_n_battles: 200
 
 random_opponent: random
