@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 import random
 import string
 from poke_env.player_configuration import PlayerConfiguration
+import pytorch_lightning as pl
 
 
 def train_wrapper(
@@ -43,9 +44,10 @@ def train(
 ) -> Dict:
 
     # TODO change eval to challange existing players by id
+    pl.seed_everything(4)
 
     trainer = Trainer(
-        gpus=0,
+        gpus=1,
         accelerator='dp',
         max_epochs=epochs,
         #log_every_n_steps=1,

@@ -33,6 +33,8 @@ from torch.distributions import Categorical, Normal
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, IterableDataset
 import torch.nn.functional as F
+from torchsummary import summary
+from contextlib import contextmanager, redirect_stdout
 
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
@@ -200,7 +202,13 @@ class PokeMLP(nn.Module):
     '''
 
 
-    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_dim: int = 1024):
+    def __init__(
+        self, 
+        input_shape: Tuple[int], 
+        n_actions: int, 
+        hidden_dim: int = 1024,
+        num_dense_layers: int = 4,
+    ):
         super().__init__()
         # I'm not sure why +2. +1 is to account for None
         self.weather_embedding = self._weather_embedding
@@ -265,14 +273,42 @@ class PokeMLP(nn.Module):
         # TODO keep testing reflex agents
         # TODO the agent does seem to behave differently based on previous attacks
         # TODO active poke net and other poke net
-        self.net = nn.Sequential(
+        total_dim = 1
+        for dim in input_shape[0:]:
+            total_dim *= dim
+
+        layers = []
+        layers.append(nn.Conv1d(input_shape[0], 64, 1))
+        layers.append(nn.LeakyReLU())
+        layers.append(nn.Conv1d(64, 64, 1))
+        layers.append(nn.LeakyReLU())
+        layers.append(nn.Linear(total_dim, total_dim//3)) # filter down to half per frame
+        #layers.append(nn.Linear(total_dim, total_dim//2)) # filter down to half per frame
+        layers.append(nn.LeakyReLU())
+        layers.append(nn.Conv1d(32, 4, 1))
+        layers.append(nn.LeakyReLU())
+        layers.append(nn.Flatten(1))
+        layers.append(nn.Linear((total_dim//3)*4, hidden_dim))
+        #layers.append(nn.Linear(total_dim, hidden_dim))
+        layers.append(nn.LeakyReLU())
+        for _ in range(num_dense_layers-1):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            #layers.append(nn.LazyLinear(hidden_dim))
+            layers.append(nn.LeakyReLU())
+        #layers.append(nn.LazyLinear(hidden_dim, n_actions))
+        layers.append(nn.Linear(hidden_dim, n_actions))
+        self.net = nn.Sequential(*layers)
+
+
+        #self.net = nn.Sequential(
             #nn.Conv1d(input_shape[0], 64, kernel_size=1),
             #nn.BatchNorm1d(32),
-            nn.Flatten(),
-            nn.LazyLinear(hidden_dim),
-            nn.LeakyReLU(),
-            nn.LazyLinear(hidden_dim),
-            nn.LeakyReLU(),
+            #nn.LazyLinear(hidden_dim),
+            #nn.LeakyReLU(),
+            #nn.LazyLinear(hidden_dim),
+            #nn.LeakyReLU(),
+            #nn.LazyLinear(hidden_dim),
+            #nn.LeakyReLU(),
             #nn.LazyLinear(hidden_dim),
             #nn.LeakyReLU(),
             #nn.LazyLinear(hidden_dim),
@@ -316,8 +352,8 @@ class PokeMLP(nn.Module):
             #nn.Linear(hidden_size, hidden_size),
             #nn.LazyLinear(hidden_size),
             #nn.ReLU(),
-            nn.LazyLinear(n_actions),
-        )
+            #nn.LazyLinear(n_actions),
+        #)
         ic(self.net)
         self.moves_range = self.move_dim * 4 * 6 
 
@@ -371,6 +407,7 @@ class PokeMLP(nn.Module):
             x.squeeze_(1)
         elif len(x.shape) < 3:
             x.unsqueeze_(0)
+        #ic(x.shape)
 
         #weather_data = x[:, :, 0]
         #ic(weather_data.shape)
@@ -552,7 +589,7 @@ class PPOLightning(pl.LightningModule):
             nb_optim_iters: how many steps of gradient descent to perform on each batch
             clip_ratio: hyperparameter for clipping in the policy objective
         """
-        super().__init__()
+        super().__init__(**kwargs)
         #env_kwargs = env_kwargs or {}
 
         # TODO separate networks for active pokemon? is hat not already what it's doing?
@@ -596,7 +633,7 @@ class PPOLightning(pl.LightningModule):
                 "Env action space should be of type Box (continous) or Discrete (categorical)."
                 f" Got type: {type(self.env.action_space)}"
             )
-
+        
         self.batch_states = []
         self.batch_actions = []
         self.batch_adv = []
@@ -624,6 +661,35 @@ class PPOLightning(pl.LightningModule):
         self.actor_bank = deque(maxlen=self.n_policies)
         self.n_policies_pushed = 0
         #self.policy_bank.append(self.build_policy(self.actor))
+
+   
+    def on_train_start(self) -> None:
+        critic_path = 'critic_summary.txt'
+        with open(critic_path, 'w') as f:
+            with redirect_stdout(f):
+                print(self.critic)
+                #summary(self.critic, self.env.observation_space.shape)
+        self.logger.experiment.log_artifact(self.logger.run_id, local_path=critic_path)
+
+        actor_path = 'actor_summary.txt'
+        with open(actor_path, 'w') as f:
+            with redirect_stdout(f):
+                print(self.actor)
+                #summary(self.actor, self.env.observation_space.shape)
+        self.logger.experiment.log_artifact(self.logger.run_id, local_path=actor_path)
+
+        return super().on_train_start()
+
+
+    def log_actor(self):
+        #local_path = f"{self.logger.save_dir}/actor.pt"
+        local_path = f"actor.pt"
+        torch.save(self.actor.state_dict(), local_path)
+        #actor_kwargs = self.net_kwargs.copy()
+        self.logger.experiment.log_artifact(self.logger.run_id, local_path=local_path)
+
+        #mlflow.pytorch.log_model(self.actor, "actor", run_id=self.logger.run_id)
+        # will this work? mlflow.pytorch.log_model(self.actor, "actor", run_id=self.logger.run_id)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Passes in a state x through the network and returns the policy and a sampled action.
@@ -810,6 +876,7 @@ class PPOLightning(pl.LightningModule):
         self.log("n_old_actors", len(self.actor_bank))
         if win_rate > self.policy_update_threshold:
             self.actor_bank.append(deepcopy(self.actor).cpu())
+            self.log_actor()
 
         if win_rate > self.best_win_rate:
             # not really useful

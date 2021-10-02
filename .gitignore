@@ -165,3 +165,6 @@ ppo_logs/
 *dmp
 
 poke-env/
+actor.pt
+actor_summary.txt
+critic_summary.txt

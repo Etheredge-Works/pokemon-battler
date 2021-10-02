@@ -203,6 +203,6 @@ class VectorizedPlayer(gym.Env):
 
         self.envs = [gym.make(env_name) for _ in range(n_obs)]
         self.n_obs = n_obs
-        self.observation_space = spaces.Box(
-            float("-inf"), float("inf"), shape=(n_obs, self..shape[0]))
+        #self.observation_space = spaces.Box(
+            #float("-inf"), float("inf"), shape=(n_obs, self..shape[0]))
         
