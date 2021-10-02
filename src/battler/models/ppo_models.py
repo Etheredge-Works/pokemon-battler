@@ -245,7 +245,7 @@ class PokeMLP(nn.Module):
         layers.append(nn.Linear(total_dim, total_dim//3)) # filter down to half per frame
         #layers.append(nn.Linear(total_dim, total_dim//2)) # filter down to half per frame
         layers.append(nn.LeakyReLU())
-        layers.append(nn.Conv1d(32, 4, 1))
+        layers.append(nn.Conv1d(64, 4, 1))
         layers.append(nn.LeakyReLU())
         layers.append(nn.Flatten(1))
         layers.append(nn.Linear((total_dim//3)*4, hidden_dim))
