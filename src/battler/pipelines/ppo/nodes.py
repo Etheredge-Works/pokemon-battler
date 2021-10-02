@@ -21,7 +21,7 @@ def train(
     pl.seed_everything(4)
 
     trainer = Trainer(
-        **trainer_kwargs
+        **trainer_kwargs,
         logger=pl.loggers.MLFlowLogger(
             experiment_name='ppo_lightning',
         )

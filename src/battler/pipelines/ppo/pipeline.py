@@ -14,16 +14,10 @@ def create_pipeline(**kwargs):
         node(
             train, 
             inputs=dict(
-                #opponent_type="params:train_opponent",
                 lightning_kwargs="params:ppo_lightning_kwargs",
-                epochs="params:epochs",
+                trainer_kwargs="params:trainer_kwargs",
             ),
             outputs=None,
-            #outputs=dict(
-                #model_path="dqn_model_path",
-                #best_model_state="dqn_model_state",
-                #best_model_kwargs="dqn_model_kwargs",
-            #),
         ),
     ])
     return train_p
