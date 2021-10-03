@@ -33,6 +33,7 @@ from kedro.pipeline import Pipeline
 
 from .pipelines.pipeline import create_data_pipeline
 from .pipelines import ppo
+from .pipelines.base import create_pipeline
 
 
 def register_pipelines() -> Dict[str, Pipeline]:
@@ -43,8 +44,10 @@ def register_pipelines() -> Dict[str, Pipeline]:
     """
     #train, eval, bless = create_data_pipeline()
     ppo_train = ppo.create_pipeline()
+    base_pipeline = create_pipeline()
     return {
         "ppo": ppo_train,
+        "base": base_pipeline,
         #"dqn_train": train,
         #"dqn_eval": eval,
         #"dqn_bless": bless,

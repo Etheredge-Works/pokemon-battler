@@ -29,6 +29,7 @@ def create_ability_encoder(gen: str) -> dict:
     ability_names = set()
     for pokemon_name, pokemon_values in data.items():
         for ability_id, ability_name in pokemon_values['abilities'].items():
+            # TODO just use ability_id?
             ability_names.add(sanitize_ability(ability_name))
 
     le = LabelEncoder()
@@ -39,17 +40,21 @@ def create_ability_encoder(gen: str) -> dict:
 
 GEN7_ABILITY_ENCODER = create_ability_encoder("gen7")
 GEN8_ABILITY_ENCODER = create_ability_encoder("gen8")
+GEN7_ABILITIES = GEN7_ABILITY_ENCODER.classes_
 GEN8_ABILITIES = GEN8_ABILITY_ENCODER.classes_
 # TODO refine for gen 8
 
 
+# TODO pull out and create encoder for each gen dynamically
 def encode_ability(battle_format: str, ability: str) -> int:
     if ability is None or ability == '':
         return 0
     ability = sanitize_ability(ability)
-    return GEN8_ABILITY_ENCODER.transform([ability])[0] + 1
+
     if 'gen7' in battle_format:
-        return GEN7_ABILITY_ENCODER.transform([ability])[0]
+        return GEN7_ABILITY_ENCODER.transform([ability])[0] + 1
+    elif 'gen8' in battle_format:
+        return GEN8_ABILITY_ENCODER.transform([ability])[0] + 1
     else:
         raise ValueError("Invalid battle format")
 
@@ -92,18 +97,21 @@ def create_pokemon_encoder(gen: str) -> dict:
     le.fit(list(pokemon_names))
     return le
 
+GEN7_POKEMON_ENCODER = create_pokemon_encoder("gen7")
+GEN7_POKEMON = GEN7_POKEMON_ENCODER.classes_
 GEN8_POKEMON_ENCODER = create_pokemon_encoder("gen8")
 GEN8_POKEMON = GEN8_POKEMON_ENCODER.classes_
 
 def encode_pokemon(battle_format: str, pokemon: str) -> int:
     if pokemon is None or pokemon == '':
         return 0
-    return GEN8_POKEMON_ENCODER.transform([clean_name(pokemon)])[0] + 1
 
     if 'gen7' in battle_format:
-        return GEN7_POKEMON_ENCODER.transform([pokemon])[0]
+        return GEN7_POKEMON_ENCODER.transform([clean_name(pokemon)])[0] + 1
+    if 'gen8' in battle_format:
+        return GEN8_POKEMON_ENCODER.transform([clean_name(pokemon)])[0] + 1
     else:
-        raise ValueError("Invalid battle format")
+        raise ValueError(f"Invalid battle format: {battle_format}")
 
 ###################
 def create_item_encoder(gen: str) -> dict:
@@ -125,15 +133,16 @@ def create_item_encoder(gen: str) -> dict:
     return le
 
 GEN7_ITEM_ENCODER = create_item_encoder("gen7")
+GEN7_ITEMS = create_item_encoder("gen7").classes_
 GEN8_ITEM_ENCODER = create_item_encoder("gen8")
 
 def encode_item(battle_format: str, item: str) -> int:
     if item is None or item == '':
         return 0 
-    return GEN8_ITEM_ENCODER.transform([item])[0] + 1
-
     if 'gen7' in battle_format:
-        return GEN7_ITEM_ENCODER.transform([item])[0]
+        return GEN7_ITEM_ENCODER.transform([item])[0] + 1
+    elif 'gen8' in battle_format:
+        return GEN8_ITEM_ENCODER.transform([item])[0] + 1
     else:
         raise ValueError("Invalid battle format")
 

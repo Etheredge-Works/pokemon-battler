@@ -24,7 +24,7 @@ loss_type: mse
 # TODO pass gpu/trainer kwargs
 ppo_lightning_kwargs:
     env_name: Pokemon-v8
-    gamma: 0.95
+    gamma: 0.97
     lam: 0.95
     lr_actor: 3.0E-4
     lr_critic: 1.0E-3
@@ -35,25 +35,26 @@ ppo_lightning_kwargs:
     #steps_per_epoch: int = 8192, # increased due to randomness of pokes
     nb_optim_iters: 4
     clip_ratio: 0.2
-    n_policies: 100
+    n_policies: 20
     policy_update_threshold: 0.6
 
     net_kwargs:
-        hidden_dim: 256
+        conv_dim: 4
+        final_conv_dim: 2
+        hidden_dim: 128
         num_dense_layers: 2
 
     env_kwargs:
         stack_size: 64
-        obs_space: 1289
-        battle_format: gen8randombattle
+        battle_format: gen7randombattle
         reward_kwargs:
-            fainted_value: 1.  # makes the agent really want to keep alive
+            #fainted_value: 1.  # makes the agent really want to keep alive
             # it might be less likely to sacrifice a pokemon even if it makes it more likely to win
-            hp_value: 1.  # makes the agent really want to keep alive
+            #hp_value: 1.  # makes the agent really want to keep alive
             #number_of_pokemons: 6
             #starting_value: 0.0
-            status_value: 0.2
-            victory_value: 6.
+            #status_value: 0.2
+            victory_value: 1.
 
 trainer_kwargs:
   gpus: 1

@@ -33,8 +33,9 @@ def embed_boosts(pokemon: Pokemon) -> np.ndarray:
 
 from poke_env.environment.move import Move
 
+MOVE_DIM = 15
 def embed_pokemon_moves(mon: Pokemon) -> np.ndarray:
-    moves = np.zeros((4, 20))
+    moves = np.zeros((4, MOVE_DIM))
     #ic(mon.moves)
     for i, m in enumerate(mon.moves.values()):
         if i > 3:
@@ -45,12 +46,13 @@ def embed_pokemon_moves(mon: Pokemon) -> np.ndarray:
         # TODO why does there sometimes get four moves?
 
     return moves
+
 def embed_move(move: Move) -> np.ndarray:
     # -1 indicates that the move does not have a base power
     # or is not available
     # TODO move to embed pokemon
     if move is None:
-        data = np.zeros(20)
+        data = np.zeros(MOVE_DIM)
         #data[1] = -1
     else:
         does_boost = move.boosts is not None
@@ -61,15 +63,15 @@ def embed_move(move: Move) -> np.ndarray:
             move.accuracy,
             int(does_boost),
             # bools
-            int(move.breaks_protect),
+            #int(move.breaks_protect),
             int(move.heal),
-            int(move.is_protect_counter),
+            #int(move.is_protect_counter),
             int(move.is_protect_move),
             #move.is_recharge, not gen 7
             int(move.force_switch),
-            int(move.ignore_ability),
-            int(move.ignore_evasion),
-            int(move.thaws_target),
+            #int(move.ignore_ability),
+            #int(move.ignore_evasion),
+            #int(move.thaws_target),
             int(move.stalling_move),
 
             # precent
@@ -83,7 +85,6 @@ def embed_move(move: Move) -> np.ndarray:
 
             # ints
             move.priority,
-            #move.n_hit[0], move.n_hit[1],
             move.expected_hits
             #move.expected_hits,
             #move.self_boosts,
@@ -91,6 +92,7 @@ def embed_move(move: Move) -> np.ndarray:
     return data
  
 
+'''
 def embed_moves(battle: Battle) -> np.ndarray:
     # -1 indicates that the move does not have a base power
     # or is not available
@@ -98,7 +100,7 @@ def embed_moves(battle: Battle) -> np.ndarray:
     moves_base_power = -np.ones(4)
     moves_dmg_multiplier = np.ones(4)
     moves_acc = np.ones(4)
-    moves_other = np.zeros((4, 16))
+    moves_other = np.zeros((4, 11))
     for i, move in enumerate(battle.available_moves):
         moves_base_power[i] = move.base_power / 100
         if move.type:
@@ -110,15 +112,15 @@ def embed_moves(battle: Battle) -> np.ndarray:
 
         moves_other[i] = np.array([
             # bools
-            int(move.breaks_protect),
+            #int(move.breaks_protect),
             int(move.heal),
-            int(move.is_protect_counter),
+            #int(move.is_protect_counter),
             int(move.is_protect_move),
             #move.is_recharge, not gen 7
             int(move.force_switch),
-            int(move.ignore_ability),
-            int(move.ignore_evasion),
-            int(move.thaws_target),
+            #int(move.ignore_ability),
+            #int(move.ignore_evasion),
+            #int(move.thaws_target),
             int(move.stalling_move),
 
             # precent
@@ -143,17 +145,17 @@ def embed_moves(battle: Battle) -> np.ndarray:
         moves_acc,
         moves_other.flatten(),
         ])
-
+'''
     
 def embed_opponent_pokemons(battle: Battle) -> np.ndarray:
     pass
 
-
+POKEMON_FLOAT_DIMS = 6+9
 # TODO write up bug on typehint of weather
 def embed_pokemon(pokemon: Pokemon) -> np.ndarray:
     # TODO encode chance of move success? maybe use counter for accuracy of protected moves?
     if pokemon is None:
-        return np.zeros(6+9)
+        return np.zeros(POKEMON_FLOAT_DIMS)
     #embed_boosts(pokemon),
     return np.concatenate([
         #pok
@@ -193,13 +195,15 @@ def encode_status(status: Status) -> int:
     return status.value + 1
 
 
-def enum_pokemon(battle, pokemon: Pokemon) -> np.ndarray:
-    poke = encode_pokemon(battle._format, pokemon._species)
+POKEMON_ENUM_DIMS = 6
+def enum_pokemon(battle: Battle, pokemon: Pokemon) -> np.ndarray:
+    gen = gen_from_tag(battle.battle_tag)
+    poke = encode_pokemon(battle.battle_tag, pokemon._species)
     type1 = encode_type(pokemon.type_1)
     type2 = encode_type(pokemon.type_2)
     
-    ability = encode_ability(battle._format, pokemon.ability)
-    item = encode_item(battle._format, pokemon.item)
+    ability = encode_ability(battle.battle_tag, pokemon.ability)
+    item = encode_item(battle.battle_tag, pokemon.item)
     status = encode_status(pokemon.status)
     # TODO encode status
     
@@ -212,6 +216,7 @@ def enum_pokemon(battle, pokemon: Pokemon) -> np.ndarray:
         item,
     ])
 
+# TODO renomoralize action spaces based on what moves are currenlty legal
 from poke_env.environment.field import Field
 def hot_field(battle) -> np.ndarray:
     encodings = np.zeros(len(Field))
@@ -249,9 +254,13 @@ def hot_side(side_conditions: Dict[SideCondition, int]):
     return conditions
 
 
+import re
+def gen_from_tag(tag):
+    return re.search(r'gen(\d)', tag).group(1)
+
 
 # TODO make embed functions a class with a method and callability
-
+BATTLE_SHAPE = 1047
 def embed_battle(battle: Battle) -> np.ndarray:
     #return BattleEmbed(battle)
     # -1 indicates that the move does not have a base power
@@ -273,22 +282,29 @@ def embed_battle(battle: Battle) -> np.ndarray:
     weather = enum_weather(battle.weather)
 
     # lines up all the types and abilities and items
-    ally_team = sorted(
-        battle.team.values(), 
+    ally_team = battle.team.values()
+    #ally_team = sorted(
+        #battle.team.values(), 
         # active first, fainted last, species next
-        key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
-    )
+        #key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
+    #)
     poke_encodes = np.array([embed_pokemon(mon) for mon in ally_team])
     # TODO by putting active mon first, could also drop active indicator.
     # TODO this also frees up the next to think differnetly in differnt layers
     # TODO the other poke layers can think differently 
 
-    opp_team = sorted(
-        battle.opponent_team.values(), 
-        key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
-    )
+    opp_team = battle.opponent_team.values()
+    #opp_team = sorted(
+        ##battle.opponent_team.values(), 
+        #key=lambda mon: (-1*int(mon.active),  int(mon.fainted), mon.species)
+    #)
 
     opp_poke_encodes = np.array([embed_pokemon(mon) for mon in opp_team])
+    missing_axis = 6 - opp_poke_encodes.shape[0]
+    zeros = np.zeros((missing_axis, opp_poke_encodes.shape[1]))
+    opp_poke_encodes = np.concatenate([opp_poke_encodes, zeros], axis=0)
+
+    # TODO embed force switch so agent can make smart move in forced switch
 
     poke_moves = np.array([embed_pokemon_moves(pokemon) for pokemon in ally_team])
     #ic(poke_moves.shape)
@@ -299,13 +315,6 @@ def embed_battle(battle: Battle) -> np.ndarray:
     opp_poke_moves = np.concatenate([opp_poke_moves, np.zeros((missing_axis, *poke_moves.shape[1:]))]) #TODO is -1 better?
     #ic(opp_poke_moves.shape)
 
-    #print(opp_poke_encodes.shape)
-    #print(np.zeros(6+8).shape)
-    missing_axis = 6 - opp_poke_encodes.shape[0]
-    zeros = np.zeros((missing_axis, opp_poke_encodes.shape[1]))
-    #print(zeros.shape)
-    opp_poke_encodes = np.concatenate([opp_poke_encodes, zeros], axis=0)
-
     # TODO : Add more embedding
     # TODO: gender 
     # TODO is plays the sllooowwest game. it needs self play to get out of rut
@@ -315,8 +324,6 @@ def embed_battle(battle: Battle) -> np.ndarray:
     boosts = embed_boosts(battle.active_pokemon)
     opp_boosts = embed_boosts(battle.opponent_active_pokemon)
 
-    opp_hp = battle.opponent_active_pokemon.current_hp_fraction
-    opp_level = battle.opponent_active_pokemon.level / 100.
     # We count how many pokemons have not fainted in each team
     remaining_mon_team = len([mon for mon in battle.team.values() if not mon.fainted]) / 6
     remaining_mon_opponent = (
@@ -357,8 +364,6 @@ def embed_battle(battle: Battle) -> np.ndarray:
             #mons_emb,
             #opp_mons_emb,
             [
-                opp_level,
-                opp_hp, 
                 remaining_mon_team, 
                 remaining_mon_opponent
             ],
@@ -368,4 +373,5 @@ def embed_battle(battle: Battle) -> np.ndarray:
     #ic()
     #ic(embedding)
     #ic(embedding.shape)
+    assert embedding.shape[0] == BATTLE_SHAPE, f"{embedding.shape} != {BATTLE_SHAPE}"
     return embedding

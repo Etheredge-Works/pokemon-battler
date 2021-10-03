@@ -8,6 +8,7 @@ from poke_env.environment.status import Status
 from poke_env.environment.pokemon_type import PokemonType
 
 from battler.utils.encoders.abilities import GEN8_POKEMON, GEN8_ABILITIES
+from battler.utils.embed import MOVE_DIM, POKEMON_FLOAT_DIMS, POKEMON_ENUM_DIMS
 
 class PokemonNet(nn.Module):
     def __init__(self,
@@ -79,16 +80,27 @@ from dataclasses import dataclass
 # TODO move to passing in embeddings
 @dataclass
 class Embeddings:
+    weather_count = 1
     weather_embedding = nn.Embedding((len(Weather)+2), 2)
+    name_count = 12
     name_embedding = nn.Embedding(len(GEN8_POKEMON)+2, 10)
+    status_count = 12
     status_embedding = nn.Embedding(len(Status)+2, 2)
     # used twice
+    #type_counts = 12 + (12 * 4 * ``)
     type_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
     #_type2_embedding = nn.Embedding(len(PokemonType)+2, 3) # 1 higher for None
     ability_embedding = nn.Embedding(272, 6)
     # TODO verify dims
     item_embedding = nn.Embedding(923, 10)
 
+
+POKE_TEAM_OFFSET = (POKEMON_FLOAT_DIMS + POKEMON_ENUM_DIMS) * 6
+MOVES_RANGE = MOVE_DIM * 4 * 6
+ally_poke_end_idx = 1 + POKE_TEAM_OFFSET
+opp_poke_end_idx = ally_poke_end_idx + POKE_TEAM_OFFSET
+ally_moves_end_idx = opp_poke_end_idx + MOVES_RANGE
+opp_moves_end_idx = ally_moves_end_idx + MOVES_RANGE
 
 class PokeMLP(nn.Module):
     #NUM_TYPES = ##6
@@ -132,10 +144,8 @@ class PokeMLP(nn.Module):
     #ic(per_poke_enum_dim)
 
     # Net for pokemon info
-    poke_floats = 15
-    per_poke_embedding_dim = per_poke_enum_dim + poke_floats
+    per_poke_embedding_dim = POKEMON_ENUM_DIMS + POKEMON_FLOAT_DIMS
     #ic(per_poke_embedding_dim)
-    move_dim = 20
     '''
     _per_poke_net = nn.Sequential(
         #nn.Conv1d(poke_embedding_dim, hidden_size, 1), # TODO convert to conv
@@ -162,14 +172,18 @@ class PokeMLP(nn.Module):
     '''
 
 
+
     def __init__(
         self, 
         input_shape: Tuple[int], 
         n_actions: int, 
         hidden_dim: int = 1024,
         num_dense_layers: int = 4,
+        conv_dim: int = 32,
+        final_conv_dim: int = 4,
     ):
         super().__init__()
+        ic(input_shape)
         # I'm not sure why +2. +1 is to account for None
         self.weather_embedding = self._weather_embedding
         self.name_embedding = self._name_embedding
@@ -233,23 +247,34 @@ class PokeMLP(nn.Module):
         # TODO keep testing reflex agents
         # TODO the agent does seem to behave differently based on previous attacks
         # TODO active poke net and other poke net
+
         total_dim = 1
         for dim in input_shape[0:]:
             total_dim *= dim
+        
+        # NOT exactly battle dims, it has encodings added
+        # TODO why does torch work with lower dims on linear????
+        total_dim = 2466
+        frame_dim = total_dim
 
         layers = []
-        layers.append(nn.Conv1d(input_shape[0], 64, 1))
+
+        # Stack depth expander
+        layers.append(nn.Conv1d(input_shape[0], conv_dim, 1))
         layers.append(nn.LeakyReLU())
-        layers.append(nn.Conv1d(64, 64, 1))
+
+        # Frame dim reducer
+        layers.append(nn.Linear(total_dim, total_dim//8)) # filter down to half per frame
         layers.append(nn.LeakyReLU())
-        layers.append(nn.Linear(total_dim, total_dim//3)) # filter down to half per frame
-        #layers.append(nn.Linear(total_dim, total_dim//2)) # filter down to half per frame
-        layers.append(nn.LeakyReLU())
-        layers.append(nn.Conv1d(64, 4, 1))
+
+        # TODO figure out conv looking set of 3 frames together for differences
+        #layers.append(nn.Conv2d(conv_dim, conv_dim, (2, frame_dim)))
+        #layers.append(nn.LeakyReLU())
+
+        layers.append(nn.Conv1d(conv_dim, final_conv_dim, 1))
         layers.append(nn.LeakyReLU())
         layers.append(nn.Flatten(1))
-        layers.append(nn.Linear((total_dim//3)*4, hidden_dim))
-        #layers.append(nn.Linear(total_dim, hidden_dim))
+        layers.append(nn.Linear((total_dim//8)*final_conv_dim, hidden_dim))
         layers.append(nn.LeakyReLU())
         for _ in range(num_dense_layers-1):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
@@ -315,7 +340,7 @@ class PokeMLP(nn.Module):
             #nn.LazyLinear(n_actions),
         #)
         ic(self.net)
-        self.moves_range = self.move_dim * 4 * 6 
+        self.moves_range = MOVE_DIM * 4 * 6 
 
         self.per_poke_net = None
         self.opp_poke_net = None
@@ -329,7 +354,7 @@ class PokeMLP(nn.Module):
 
 
     def move_forward(self, x, net):
-        moves_raw = x[:, : , :self.moves_range].view(*x.shape[0:2], 6, 4, self.move_dim)
+        moves_raw = x[:, : , :self.moves_range].view(*x.shape[0:2], 6, 4, MOVE_DIM)
         ##ic(moves_raw.shape)
         int_in = moves_raw[:, :, :, :, 0].long()
         #ic(int_in.shape)
@@ -367,62 +392,27 @@ class PokeMLP(nn.Module):
             x.squeeze_(1)
         elif len(x.shape) < 3:
             x.unsqueeze_(0)
-        ic(x.shape)
-
-        #weather_data = x[:, :, 0]
-        #ic(weather_data.shape)
-        #ally_pokemon_data = x[:, :, 1:127].view(x.shape[0], x.shape[1], 6, 21)
-        #ic(ally_pokemon_data.shape)
-
-
-        #weather = self.weather_embedding(x[:, :, 0:1])
-        #type_idx = [
-            #*list(range(13, 25)), 
-            #*list(range(12+127, 24+127)),
-            #254, 274, 294, 114, 
-        #]
-        #ic(type_idx)
-
-
-
-        # better way below ######
-
-        #ic()
-        #ic(x.shape)
-        #print(f"input: {x.shape}")
 
         x_ints = torch.round(x[:, :, :1]).long()
 
         weather = self.weather_embedding(x_ints[:, :, 0:1]).view(x_ints.shape[0], x_ints.shape[1], -1)
 
-
-        ally_moves_delta = 254 + self.moves_range
-        #ic(ally_moves_delta)
-        ally_move_x = self.move_forward(x[:, :, 254:ally_moves_delta], self.move_net)
-        #ic(ally_move_x.shape)
-        ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
-
-        opp_move_delts = ally_moves_delta + self.moves_range
-        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.opp_move_net)
-        opp_move_x = self.move_forward(x[:, :, ally_moves_delta:opp_move_delts], self.opp_move_net)
-        #ic(opp_move_x.shape)
-        opp_move_x = opp_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
-        #ic(opp_move_x.shape)
-
         # Friendly Pokes
-        poke_x = self.poke_forward(x[:, :, 1:127], self.per_poke_net)
-
+        poke_x = self.poke_forward(x[:, :, 1:ally_poke_end_idx], self.per_poke_net)
         # Opponent Pokes
-        opp_poke_x = self.poke_forward(x[:, :, 127:254], self.opp_poke_net)
+        opp_poke_x = self.poke_forward(x[:, :, ally_poke_end_idx:opp_poke_end_idx], self.opp_poke_net)
 
         # TODO handle type encoding in moves
+        ally_move_x = self.move_forward(x[:, :, opp_poke_end_idx:ally_moves_end_idx], self.move_net)
+        ally_move_x = ally_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
 
-        x = torch.cat((poke_x, opp_poke_x, weather, ally_move_x, opp_move_x, x[:, :, opp_move_delts:]), dim=-1)
-        #ic(x.shape)
+        opp_move_x = self.move_forward(x[:, :, ally_moves_end_idx:opp_moves_end_idx], self.opp_move_net)
+        opp_move_x = opp_move_x.view(x_ints.shape[0], x_ints.shape[1], -1)
+
+        x = torch.cat((poke_x, opp_poke_x, weather, ally_move_x, opp_move_x, x[:, :, opp_moves_end_idx:]), dim=-1)
 
         x = self.net(x)
         
         x.squeeze_(0)
-        ic(x.shape)
         return x
  

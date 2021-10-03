@@ -148,9 +148,7 @@ class PPOLightning(pl.LightningModule):
         lr_critic: float = 1e-3,
         max_episode_len: float = 100,
         batch_size: int = 512,
-        #batch_size: int = 1024,
         steps_per_epoch: int = 4096, # increased due to randomness of pokes
-        #steps_per_epoch: int = 8192, # increased due to randomness of pokes
         nb_optim_iters: int = 4,
         clip_ratio: float = 0.2,
         n_policies: int = 100,
@@ -194,7 +192,9 @@ class PPOLightning(pl.LightningModule):
         self.save_hyperparameters()
 
         self.player_id = self.env.username
-        self.save_hyperparameters(dict(player_id=self.player_id))
+        self.save_hyperparameters(dict(
+            player_id=self.player_id,
+            action_space=self.env.action_space))
 
         # value network
         self.critic = PokeMLP(self.env.observation_space.shape, 1, **net_kwargs)
@@ -242,7 +242,6 @@ class PPOLightning(pl.LightningModule):
         self.actor_bank = deque(maxlen=self.n_policies)
         self.n_policies_pushed = 0
         #self.policy_bank.append(self.build_policy(self.actor))
-
    
     def on_train_start(self) -> None:
         critic_path = 'critic_summary.txt'
@@ -260,7 +259,6 @@ class PPOLightning(pl.LightningModule):
         self.logger.experiment.log_artifact(self.logger.run_id, local_path=actor_path)
 
         return super().on_train_start()
-
 
     def log_actor(self):
         #local_path = f"{self.logger.save_dir}/actor.pt"
@@ -445,7 +443,7 @@ class PPOLightning(pl.LightningModule):
 
         self.log("n_battles", self.env.n_finished_battles)
         self.log("n_battles_per_epoch", battles_delta)
-        self.log("win_rate", win_rate)
+        self.log("win_rate", win_rate, prog_bar=True)
 
         self.n_wins = self.env.n_won_battles
         self.n_battles = self.env.n_finished_battles
@@ -454,10 +452,12 @@ class PPOLightning(pl.LightningModule):
         # TODO really should evaluate agent against old agent instead of this way
         # TODO but this way does make sure agent doesn't overfit and stays
         #      in the same performance relative to old policies
-        self.log("n_old_actors", len(self.actor_bank))
+        self.log("n_old_actors", len(self.actor_bank), prog_bar=False)
+        self.log("n_policies_pushed", self.n_policies_pushed, prog_bar=True)
         if win_rate > self.policy_update_threshold:
             self.actor_bank.append(deepcopy(self.actor).cpu())
             self.log_actor()
+            self.n_policies_pushed += 1
 
         if win_rate > self.best_win_rate:
             # not really useful
@@ -504,8 +504,8 @@ class PPOLightning(pl.LightningModule):
         # normalize advantages
         adv = (adv - adv.mean()) / adv.std()
 
-        self.log("avg_ep_len", self.avg_ep_len, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("avg_ep_reward", self.avg_ep_reward, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("avg_ep_len", self.avg_ep_len, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("avg_ep_reward", self.avg_ep_reward, prog_bar=False, on_step=False, on_epoch=True)
         self.log("avg_reward", self.avg_reward, prog_bar=False, on_step=False, on_epoch=True)
 
         if optimizer_idx == 0:

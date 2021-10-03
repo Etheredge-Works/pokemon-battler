@@ -3,7 +3,7 @@ from poke_env.player.random_player import RandomPlayer
 from poke_env.environment.battle import Battle, AbstractBattle
 from poke_env.player.env_player import Gen7EnvSinglePlayer, Gen8EnvSinglePlayer
 from typing import Callable
-from ..utils.embed import embed_battle
+from ..utils.embed import embed_battle, BATTLE_SHAPE
 import numpy as np
 from typing import List, Dict
 from gym.spaces import Discrete
@@ -15,6 +15,8 @@ from torch import nn
 from torch.nn import functional as F
 from collections import deque
 from icecream import ic
+from poke_env.player.battle_order import BattleOrder
+import gym
 
 
 def build_static_policy(net: nn.Module, prob: float) -> Callable:
@@ -73,32 +75,35 @@ class MaxDamagePlayer(RandomPlayer):
         else:
             return self.choose_random_move(battle)
 
-import gym
-gym.register(
-    id='Pokemon-v8',
-    entry_point='battler.players.players:RLPlayer',
-    max_episode_steps=1000,
-    nondeterministic=True,
-)
-class RLPlayer(Gen8EnvSinglePlayer):
+
+class RLPlayer7(Gen7EnvSinglePlayer):
     def __init__(
         self, 
         reward_kwargs: Dict = None,
-        obs_space: int = 1,
         stack_size: int = 1,
+        battle_format: str = 'gen7randombattle',
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(battle_format=battle_format, **kwargs)
+        # take out z moves, mega moves, and dyna moves
 
-        self.obs_space = obs_space
+        # TODO reduce action space
+        # TODO pokemon sorting based on switches
         self._action_space = spaces.Discrete(len(self._ACTION_SPACE))
 
         self.reward_kwargs = reward_kwargs or {}
         self.state = None
         self.stack_size = stack_size
+
         self._observation_space = spaces.Box(
-            float("-inf"), float("inf"), shape=(stack_size, self.obs_space,))
+            float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
         
+    def _action_to_move(self, action: int, battle: Battle) -> BattleOrder:
+        #if action >= 4:
+            #action += self.removed_actions_delta
+
+        return super()._action_to_move(action, battle)
+
     @property
     def observation_space(self) -> np.array:
         return self._observation_space
@@ -107,8 +112,6 @@ class RLPlayer(Gen8EnvSinglePlayer):
     def action_space(self) -> List:
         """Returns the action space of the player. Must be implemented by subclasses."""
         return self._action_space
-        #return spaces.Discrete(21)
-        #return spaces.Discrete(self._ACTION_SPACE)
 
     def reset(self):
         self.state = None
@@ -118,59 +121,65 @@ class RLPlayer(Gen8EnvSinglePlayer):
         return self.reward_computing_helper(
             battle,
             **self.reward_kwargs,
-            #victory_value=30,
-            #fainted_value=-2,
-            #hp_value=2,
-            #status_value=0.5
-            
         )
-        starting_value = 0
-        number_of_pokemons = 6
 
-        prorated_value = 6 
-        victory_value = 1
-        fainted_value = prorated_value / number_of_pokemons
-        status_value = fainted_value / 5
-        hp_value = fainted_value - status_value
+    def embed_battle(self, battle: AbstractBattle) -> np.ndarray:
+        battle_embedding = embed_battle(battle)
+        if self.state is None:
+            self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
+        else:
+            self.state.append(battle_embedding)
+        return np.stack(self.state)
 
-        if battle not in self._reward_buffer:
-            self._reward_buffer[battle] = starting_value
-        current_value = 0
+class RLPlayer8(Gen8EnvSinglePlayer):
+    def __init__(
+        self, 
+        reward_kwargs: Dict = None,
+        stack_size: int = 1,
+        battle_format: str = 'gen8randombattle',
+        **kwargs,
+    ):
+        super().__init__(battle_format=battle_format, **kwargs)
+        # take out z moves, mega moves, and dyna moves
+        #self.removed_actions_delta = 4 * 3
+        #last_action = len(self._ACTION_SPACE) - self.removed_actions_delta
+        #self._ACTION_SPACE = range(0, last_action)
 
-        #for mon in battle.team.values():
-            #current_value += mon.current_hp_fraction * hp_value
-            #if mon.fainted:
-                #current_value -= fainted_value
-            #elif mon.status is not None:
-                #current_value -= status_value
+        # TODO reduce action space
+        # TODO pokemon sorting based on switches
+        self._action_space = spaces.Discrete(len(self._ACTION_SPACE))
 
-        #current_value += (number_of_pokemons - len(battle.team)) * hp_value
+        self.reward_kwargs = reward_kwargs or {}
+        self.state = None
+        self.stack_size = stack_size
 
-        for mon in battle.opponent_team.values():
-            #current_value += 1/ (mon.current_hp_fraction * hp_value)
-            #damange_done = mon.current_hp_fraction * hp_value
-            if mon.fainted:
-                current_value += fainted_value
-            else:
-                if mon.status is not None:
-                    current_value += status_value
-                # 1.0 -> 0.0 * hp_value
-                # 0.0 -> 1 * hp_value
-                # 0.2 -> 0.8 * hp_value
-                current_value += (1 - mon.current_hp_fraction) * hp_value
+        self._observation_space = spaces.Box(
+            float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
+        
+    def _action_to_move(self, action: int, battle: Battle) -> BattleOrder:
+        #if action >= 4:
+            #action += self.removed_actions_delta
 
+        return super()._action_to_move(action, battle)
 
-        # NOTE need some victory value or agent could delay the game more? 
-        #      shouldn't since it wants the W sooner foro the hp reward
-        #if battle.won:
-            #current_value += victory_value
-        #elif battle.lost:
-            #current_value -= victory_value
+    @property
+    def observation_space(self) -> np.array:
+        return self._observation_space
 
-        to_return = current_value - self._reward_buffer[battle]
-        self._reward_buffer[battle] = current_value
+    @property
+    def action_space(self) -> List:
+        """Returns the action space of the player. Must be implemented by subclasses."""
+        return self._action_space
 
-        return to_return
+    def reset(self):
+        self.state = None
+        return super().reset()
+
+    def compute_reward(self, battle: Battle) -> float:
+        return self.reward_computing_helper(
+            battle,
+            **self.reward_kwargs,
+        )
 
     def embed_battle(self, battle: AbstractBattle) -> np.ndarray:
         battle_embedding = embed_battle(battle)

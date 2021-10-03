@@ -36,6 +36,10 @@ async-timeout==3.0.1
     # via aiohttp
 asyncio==3.4.3
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
+atari-py==0.2.6
+    # via
+    #   gym
+    #   stable-baselines3
 attrs==21.2.0
     # via
     #   aiohttp
@@ -60,6 +64,8 @@ botocore==1.21.49
     # via
     #   boto3
     #   s3transfer
+box2d-py==2.3.8
+    # via gym
 cachetools==4.2.2
     # via
     #   google-auth
@@ -67,7 +73,9 @@ cachetools==4.2.2
 certifi==2021.5.30
     # via requests
 cffi==1.14.6
-    # via argon2-cffi
+    # via
+    #   argon2-cffi
+    #   mujoco-py
 chardet==4.0.0
     # via
     #   aiohttp
@@ -91,6 +99,7 @@ cloudpickle==1.6.0
     # via
     #   gym
     #   mlflow
+    #   stable-baselines3
 cmaes==0.8.2
     # via optuna
 cmd2==2.2.0
@@ -105,6 +114,10 @@ cookiecutter==1.7.3
     # via kedro
 coverage==5.5
     # via pytest-cov
+cycler==0.10.0
+    # via matplotlib
+cython==0.29.24
+    # via mujoco-py
 databricks-cli==0.15.0
     # via mlflow
 debugpy==1.4.3
@@ -146,6 +159,8 @@ gitpython==3.1.18
     # via
     #   kedro
     #   mlflow
+glfw==2.3.0
+    # via mujoco-py
 google-auth-oauthlib==0.4.6
     # via tensorboard
 google-auth==1.35.0
@@ -162,10 +177,11 @@ grpcio==1.40.0
     #   tensorflow
 gunicorn==20.1.0
     # via mlflow
-gym==0.19.0
+gym[all]==0.19.0
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
     #   poke-env
+    #   stable-baselines3
 h5py==3.1.0
     # via tensorflow
 icecream==2.1.1
@@ -175,6 +191,10 @@ idna==2.10
     #   anyio
     #   requests
     #   yarl
+imageio==2.9.0
+    # via
+    #   gym
+    #   mujoco-py
 importlib-metadata==4.8.1
     # via mlflow
 iniconfig==1.1.1
@@ -279,6 +299,10 @@ keras-preprocessing==1.1.2
     # via tensorflow
 keras==2.6.0
     # via tensorflow
+kiwisolver==1.3.2
+    # via matplotlib
+lockfile==0.12.2
+    # via mujoco-py
 mako==1.1.5
     # via alembic
 markdown==3.3.4
@@ -291,12 +315,16 @@ matplotlib-inline==0.1.3
     # via
     #   ipykernel
     #   ipython
+matplotlib==3.4.3
+    # via stable-baselines3
 mccabe==0.6.1
     # via flake8
 mistune==0.8.4
     # via nbconvert
 mlflow==1.20.2
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
+mujoco-py==1.50.1.68
+    # via gym
 multidict==5.1.0
     # via
     #   aiohttp
@@ -331,11 +359,16 @@ notebook==6.4.3
     #   widgetsnbextension
 numpy==1.19.5
     # via
+    #   atari-py
     #   cmaes
     #   gym
     #   h5py
+    #   imageio
     #   keras-preprocessing
+    #   matplotlib
     #   mlflow
+    #   mujoco-py
+    #   opencv-python
     #   opt-einsum
     #   optuna
     #   pandas
@@ -343,12 +376,17 @@ numpy==1.19.5
     #   pytorch-lightning
     #   scikit-learn
     #   scipy
+    #   stable-baselines3
     #   tensorboard
     #   tensorflow
     #   torchmetrics
     #   torchvision
 oauthlib==3.1.1
     # via requests-oauthlib
+opencv-python==4.5.3.56
+    # via
+    #   gym
+    #   stable-baselines3
 opt-einsum==3.3.0
     # via tensorflow
 optuna==2.9.1
@@ -369,6 +407,7 @@ pandas==1.3.3
     # via
     #   kedro
     #   mlflow
+    #   stable-baselines3
 pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.2
@@ -386,6 +425,9 @@ pickleshare==0.7.5
 pillow==8.3.2
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
+    #   imageio
+    #   matplotlib
+    #   stable-baselines3
     #   torchvision
 pip-tools==5.5.0
     # via kedro
@@ -415,6 +457,8 @@ protobuf==3.17.3
     #   mlflow
     #   tensorboard
     #   tensorflow
+psutil==5.8.0
+    # via stable-baselines3
 ptyprocess==0.7.0
     # via
     #   pexpect
@@ -435,6 +479,8 @@ pydeprecate==0.3.1
     # via pytorch-lightning
 pyflakes==2.3.1
     # via flake8
+pyglet==1.5.21
+    # via gym
 pygments==2.10.0
     # via
     #   icecream
@@ -446,6 +492,7 @@ pygments==2.10.0
 pyparsing==2.4.7
     # via
     #   cliff
+    #   matplotlib
     #   packaging
 pyperclip==1.8.2
     # via cmd2
@@ -466,6 +513,7 @@ python-dateutil==2.8.2
     #   arrow
     #   botocore
     #   jupyter-client
+    #   matplotlib
     #   pandas
 python-editor==1.0.4
     # via alembic
@@ -529,6 +577,7 @@ scikit-learn==1.0
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 scipy==1.7.1
     # via
+    #   gym
     #   optuna
     #   scikit-learn
 send2trash==1.8.0
@@ -540,8 +589,10 @@ six==1.15.0
     #   absl-py
     #   asttokens
     #   astunparse
+    #   atari-py
     #   bleach
     #   cookiecutter
+    #   cycler
     #   databricks-cli
     #   google-auth
     #   google-pasta
@@ -563,6 +614,8 @@ sqlalchemy==1.4.23
     #   optuna
 sqlparse==0.4.2
     # via mlflow
+stable-baselines3[extra]==1.2.0
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 stevedore==3.4.0
     # via cliff
 tabulate==0.8.9
@@ -576,6 +629,7 @@ tensorboard-plugin-wit==1.8.0
 tensorboard==2.6.0
     # via
     #   pytorch-lightning
+    #   stable-baselines3
     #   tensorflow
 tensorflow-estimator==2.6.0
     # via tensorflow
@@ -605,6 +659,7 @@ torch==1.9.1+cu111
     # via
     #   -r /home/ben/projects/pokemon-battler/src/requirements.in
     #   pytorch-lightning
+    #   stable-baselines3
     #   torchaudio
     #   torchmetrics
     #   torchvision
@@ -612,6 +667,8 @@ torchaudio==0.9.1
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 torchmetrics==0.5.1
     # via pytorch-lightning
+torchsummary==1.5.1
+    # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 torchvision==0.10.1+cu111
     # via -r /home/ben/projects/pokemon-battler/src/requirements.in
 tornado==6.1

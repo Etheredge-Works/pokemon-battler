@@ -12,7 +12,7 @@ from battler.models.lightning import DQNLightning
 #from battler.players.opponents import #OpponentPlayer
 
 #from poke_env.player.random_player import RandomPlayer
-from battler.players.players import RLPlayer
+from battler.players.players import RLPlayer8 as RLPlayer
 from battler.players.opponents import MaxDamagePlayer, RandomOpponentPlayer, RLOpponentPlayer
 import pytorch_lightning as pl
 

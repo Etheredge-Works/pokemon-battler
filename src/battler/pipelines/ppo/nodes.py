@@ -2,7 +2,7 @@ from typing import Dict
 
 from poke_env.player.random_player import RandomPlayer
 from battler.models.ppo import PPOLightning
-from battler.players.players import RLPlayer, MaxDamagePlayer
+#from battler.players.players import RLPlayer, MaxDamagePlayer
 from pytorch_lightning import Trainer
 import pytorch_lightning as pl
 import random

@@ -13,7 +13,8 @@ wheel>=0.35, <0.37
 
 tensorflow
 optuna
-gym
+# TODO not all for deployment/training
+gym[all]
 poke-env
 pillow
 asyncio
@@ -27,3 +28,5 @@ torchaudio==0.9.1
 pytorch-lightning
 icecream
 scikit-learn 
+torchsummary
+stable-baselines3[extra]
