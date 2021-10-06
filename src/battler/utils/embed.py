@@ -226,10 +226,13 @@ def hot_field(battle) -> np.ndarray:
     return encodings
 
 from poke_env.environment.field import Field
-def enum_weather(weather: Weather) -> np.ndarray:
-    if weather is None:
+from typing import Dict
+def enum_weather(weathers: Dict[Weather, int]) -> np.ndarray:
+    try:
+        weather = list(weathers.keys())[0]
+        return weather.value + 1
+    except IndexError:
         return 0
-    return weather.value + 1
 
 def embed_field(battle: Battle):
     return np.array([
