@@ -131,6 +131,29 @@ class RLPlayer7(Gen7EnvSinglePlayer):
             self.state.append(battle_embedding)
         return np.stack(self.state)
 
+class WrappedPlayer(gym.Wrapper):
+    def __init__(self, env, **kwargs):
+        super().__init__(env)
+        self.kwargs = kwargs
+
+    def reset(self):
+        return self.env.reset()
+
+    def step(self, action):
+        return self.env.step(action)
+
+    def render(self, *args, **kwargs):
+        return self.env.render(*args, **kwargs)
+
+    def close(self):
+        return self.env.close()
+
+    def seed(self, seed=None):
+        return self.env.seed(seed)
+
+    def __getattr__(self, name):
+        return getattr(self.env, name)
+
 class RLPlayer8(Gen8EnvSinglePlayer):
     def __init__(
         self, 
@@ -140,6 +163,7 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         **kwargs,
     ):
         super().__init__(battle_format=battle_format, **kwargs)
+        ic("post init")
         # take out z moves, mega moves, and dyna moves
         #self.removed_actions_delta = 4 * 3
         #last_action = len(self._ACTION_SPACE) - self.removed_actions_delta
@@ -154,7 +178,8 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         self.stack_size = stack_size
 
         self._observation_space = spaces.Box(
-            float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
+            float("-inf"), float("inf"), shape=(BATTLE_SHAPE,))
+            #float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
         
     def _action_to_move(self, action: int, battle: Battle) -> BattleOrder:
         #if action >= 4:
@@ -182,7 +207,9 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         )
 
     def embed_battle(self, battle: AbstractBattle) -> np.ndarray:
+        # TODO stacking should be done with a wrapper
         battle_embedding = embed_battle(battle)
+        return battle_embedding
         if self.state is None:
             self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
         else:
