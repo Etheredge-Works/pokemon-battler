@@ -186,6 +186,10 @@ class RLPlayer8(Gen8EnvSinglePlayer):
 
         return super()._action_to_move(action, battle)
 
+    def _battle_finished_callback(self, _):
+        super()._battle_finished_callback(_)
+        self.state = None
+
     def get_opponent_policy_setter(self):
         return self._opponent.set_policy
 

@@ -30,14 +30,7 @@ from battler.models.ppo_models import PokeMLP
 from stable_baselines3.common.env_checker import check_env
 from collections import deque
 
-def pls(model):
-    def policy(observation):
-        return model.predict(observation)
-    return policy
 
-class Opp(DummyPlayer):
-    def set_policy(self, policy):
-            self.policy = lambda x: policy.predict(x, None, None, None)
 class SelfPlayCallback(BaseCallback):
     def __init__(
         self, 
@@ -88,6 +81,7 @@ class SelfPlayCallback(BaseCallback):
         self.add_policy()
         self.logger.record("self_play/n_policies", len(self.policies))
         self.logger.record("self_play/policy_switches", self.policy_switches)
+        self.logger.record("self_play/policy_pushes", self.policy_pushes)
         #if self.model.logger.name_to_value[]
         #ic(self.globals)
         #$ic(self.locals)
@@ -119,7 +113,8 @@ def policy_creator(model):
 # TODO move poke-envs to dict spaces
 
 from stable_baselines3.common.vec_env import VecFrameStack
-N_ENVS = 4
+N_ENVS = 2
+stack_size = 1
 def train():
     #env = make_vec_env(
         #'Pokemon-v8', 
@@ -128,32 +123,41 @@ def train():
             #"battler_embedder": lambda _: np.array([0., 0.1, 2., 0.1])
         #}
     # NOTE can't make n_envs bigger than batch_size?
-    check_env(gym.make('Pokemon-v8'))
+    #check_env(gym.make('Pokemon-v8', stack_size=10))
     env = make_vec_env(
         'Pokemon-v8', 
         n_envs=N_ENVS, 
         seed=0, 
         vec_env_cls=SubprocVecEnv, 
+        #vec_env_cls=DummyVecEnv, 
         env_kwargs=dict(
-            opponent_cls=Opp, 
+            opponent_cls=DummyPlayer, 
+            #opponent_kwargs=dict(
+                #battle_embedder=embed_battle, 
+                #stack_size=stack_size),
+            #),
             battle_embedder=embed_battle, 
-            stack_size=1))
+            stack_size=stack_size,
+        ),
+    )
     ic(env.observation_space)
     #env = VecFrameStack(env, n_stack=32, channels_order='first')
     ic(env.observation_space)
 
+    '''
     #eval_env = make_vec_env('Pokemon-v8', n_envs=1)
     eval_env = make_vec_env(
         'Pokemon-v8', 
         n_envs=max(1, N_ENVS//4), 
         seed=0, 
-        #n_eval_episodes=1000,
         vec_env_cls=SubprocVecEnv,
         env_kwargs=dict(
             opponent_cls=MaxBasePowerPlayer,
             opponent_kwargs=dict(
-                battle_format='gen8randombattle')
-        ))
+                battle_format='gen8randombattle'),
+            stack_size=stack_size,
+        )
+    )
     # TODO pull out embedings since procs seem to rebuilding them
     #eval_env = VecFrameStack(eval_env, n_stack=4, channels_order='first')
     opp_update_cb = SelfPlayCallback(
@@ -175,6 +179,7 @@ def train():
         deterministic=False,  # need stocastic actions due to nature of pokemon battles
         render=False,
         callback_on_new_best=None)
+    '''
 
 
     policy_kwargs = dict(
@@ -188,15 +193,15 @@ def train():
         'MlpPolicy', 
         env, 
         policy_kwargs=policy_kwargs,
-        batch_size=max(N_ENVS, 512),
-        n_steps=8192//N_ENVS,
+        #batch_size=max(N_ENVS, 512),
+        #n_steps=8192//N_ENVS,
         tensorboard_log='tensorboard_log/ppo',
         verbose=1)
 
     model.learn(
         total_timesteps=8000000,
         #callback=eval_callback,
-        callback=[eval_callback, opp_update_cb],
+        #callback=[eval_callback, opp_update_cb],
     )
     # TODO don't use dummy vec. use process vec!!!!
 
