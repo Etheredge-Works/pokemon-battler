@@ -10,7 +10,13 @@ gym.register(
 gym.register(
     id='Pokemon-v8',
     entry_point='battler.players.players:RLPlayer8',
-    # TODO this adds wraps?
+    #battle_format=''
+    ## TODO this adds wraps?
     #max_episode_steps=1000,
     #nondeterministic=True,
 )
+
+#gym.register(
+    #id='-v8',
+    #entry_point='battler.players.players:RLPlayer8',
+    #battle_format=''

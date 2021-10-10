@@ -168,3 +168,4 @@ poke-env/
 actor.pt
 actor_summary.txt
 critic_summary.txt
+tensorboard_log/

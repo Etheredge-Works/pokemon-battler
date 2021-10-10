@@ -163,7 +163,6 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         **kwargs,
     ):
         super().__init__(battle_format=battle_format, **kwargs)
-        ic("post init")
         # take out z moves, mega moves, and dyna moves
         #self.removed_actions_delta = 4 * 3
         #last_action = len(self._ACTION_SPACE) - self.removed_actions_delta
@@ -178,7 +177,7 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         self.stack_size = stack_size
 
         self._observation_space = spaces.Box(
-            float("-inf"), float("inf"), shape=(BATTLE_SHAPE,))
+            float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
             #float("-inf"), float("inf"), shape=(stack_size, BATTLE_SHAPE,))
         
     def _action_to_move(self, action: int, battle: Battle) -> BattleOrder:
@@ -186,6 +185,12 @@ class RLPlayer8(Gen8EnvSinglePlayer):
             #action += self.removed_actions_delta
 
         return super()._action_to_move(action, battle)
+
+    def get_opponent_policy_setter(self):
+        return self._opponent.set_policy
+
+    def set_opponent_policy(self, policy):
+        self._opponent.policy = policy
 
     @property
     def observation_space(self) -> np.array:
@@ -198,7 +203,10 @@ class RLPlayer8(Gen8EnvSinglePlayer):
 
     def reset(self):
         self.state = None
-        return super().reset()
+        r = super().reset()
+        #ic(r.shape)
+        #self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
+        return r
 
     def compute_reward(self, battle: Battle) -> float:
         return self.reward_computing_helper(
@@ -209,7 +217,9 @@ class RLPlayer8(Gen8EnvSinglePlayer):
     def embed_battle(self, battle: AbstractBattle) -> np.ndarray:
         # TODO stacking should be done with a wrapper
         battle_embedding = embed_battle(battle)
-        return battle_embedding
+        #er = np.expand_dims(er, axis=0)
+        #return er
+        #return np.stack([battle_embedding]).swapaxes(0, 1)
         if self.state is None:
             self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
         else:

@@ -33,7 +33,7 @@ def create_ability_encoder(gen: str) -> dict:
             ability_names.add(sanitize_ability(ability_name))
 
     le = LabelEncoder()
-    print(f"ability_count: {len(ability_names)}")
+    #print(f"ability_count: {len(ability_names)}")
     le.fit(list(ability_names))
     return le
     
@@ -92,7 +92,7 @@ def create_pokemon_encoder(gen: str) -> dict:
             for name in pokemon_values.get('formeOrder'):
                 pokemon_names.add(clean_name(name))
     
-    print(f"pokemon count : {len(pokemon_names)}")
+    #print(f"pokemon count : {len(pokemon_names)}")
     le = LabelEncoder()
     le.fit(list(pokemon_names))
     return le
@@ -127,7 +127,7 @@ def create_item_encoder(gen: str) -> dict:
     item_names = [name.lower() for name in item_names]
     item_names = [name.replace(" ", "") for name in item_names]
 
-    print(f"item_count: {len(item_names)}")
+    #print(f"item_count: {len(item_names)}")
     le = LabelEncoder()
     le.fit(item_names)
     return le
@@ -163,7 +163,7 @@ def create_move_encoder(gen: str) -> dict:
     move_names = [name.lower() for name in move_names]
     move_names = [name.replace(" ", "") for name in move_names]
 
-    print(f"move_count: {len(move_names)}")
+    #print(f"move_count: {len(move_names)}")
     le = LabelEncoder()
     le.fit(move_names)
     return le

@@ -9,6 +9,7 @@ from poke_env.environment.pokemon_type import PokemonType
 
 from battler.utils.encoders.abilities import GEN8_POKEMON, GEN8_ABILITIES
 from battler.utils.embed import MOVE_DIM, POKEMON_FLOAT_DIMS, POKEMON_ENUM_DIMS
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 class PokemonNet(nn.Module):
     def __init__(self,
@@ -102,7 +103,9 @@ opp_poke_end_idx = ally_poke_end_idx + POKE_TEAM_OFFSET
 ally_moves_end_idx = opp_poke_end_idx + MOVES_RANGE
 opp_moves_end_idx = ally_moves_end_idx + MOVES_RANGE
 
-class PokeMLP(nn.Module):
+#class PokeMLP(nn.Module):
+
+class PokeMLP(BaseFeaturesExtractor):
     #NUM_TYPES = ##6
     '''
     layout:
@@ -171,18 +174,19 @@ class PokeMLP(nn.Module):
     )
     '''
 
-
-
     def __init__(
         self, 
-        input_shape: Tuple[int], 
+        observation_space: Tuple[int], 
         n_actions: int, 
         hidden_dim: int = 1024,
-        num_dense_layers: int = 4,
+        num_dense_layers: int = 1,
         conv_dim: int = 32,
-        final_conv_dim: int = 4,
+        final_conv_dim: int = 2,
+        features_dim: int = 256,
     ):
-        super().__init__()
+        super().__init__(observation_space, n_actions)
+        input_shape = observation_space.shape
+        ic(observation_space)
         ic(input_shape)
         # I'm not sure why +2. +1 is to account for None
         self.weather_embedding = self._weather_embedding
@@ -281,6 +285,7 @@ class PokeMLP(nn.Module):
             #layers.append(nn.LazyLinear(hidden_dim))
             layers.append(nn.LeakyReLU())
         #layers.append(nn.LazyLinear(hidden_dim, n_actions))
+        #layers.append(nn.Linear(hidden_dim, n_actions))
         layers.append(nn.Linear(hidden_dim, n_actions))
         self.net = nn.Sequential(*layers)
 
@@ -387,11 +392,15 @@ class PokeMLP(nn.Module):
         return poke_x
     
     def forward(self, x):
-        if len(x.shape) == 4:
+        #if len(x.shape) == 4:
             # Needed because it one time gets 512x1x.x.
-            x.squeeze_(1)
-        elif len(x.shape) < 3:
-            x.unsqueeze_(0)
+            #x.squeeze_(1)
+        #elif len(x.shape) < 3:
+            #x.unsqueeze_(0)
+        
+        #x.squeeze_(0)
+        #ic(x.shape)
+        #x = x.swapaxes(1, -1)
 
         x_ints = torch.round(x[:, :, :1]).long()
 
@@ -413,6 +422,7 @@ class PokeMLP(nn.Module):
 
         x = self.net(x)
         
-        x.squeeze_(0)
+        #x.squeeze_(0)
+        #ic(x.shape)
         return x
  
