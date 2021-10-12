@@ -70,6 +70,10 @@ class DQNLightning(pl.LightningModule):
       )
     )
     """
+    # TODO using value iteration and stacking, 
+    # will stocasticness be an issue?
+    # or will it be compensated by stacking and knowing to do different things?
+    # no because it can still be exploited
 
     def __init__(
         self,

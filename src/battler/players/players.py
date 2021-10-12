@@ -194,7 +194,7 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         return self._opponent.set_policy
 
     def set_opponent_policy(self, policy):
-        self._opponent.policy = policy
+        self._opponent.set_policy(policy)
 
     @property
     def observation_space(self) -> np.array:
@@ -225,9 +225,8 @@ class RLPlayer8(Gen8EnvSinglePlayer):
         #return er
         #return np.stack([battle_embedding]).swapaxes(0, 1)
         if self.state is None:
-            self.state = deque([battle_embedding for _ in range(self.stack_size)], maxlen=self.stack_size)
-        else:
-            self.state.append(battle_embedding)
+            self.state = deque([battle_embedding for _ in range(self.stack_size-1)], maxlen=self.stack_size)
+        self.state.append(battle_embedding)
         #return self.state
         #return battle_embedding
         return np.stack(self.state)
