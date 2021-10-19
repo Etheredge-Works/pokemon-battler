@@ -35,6 +35,7 @@ from torchsummary import summary
 from poke_env.player.env_player import Gen8EnvSinglePlayer
 
 
+from stable_baselines3.common.evaluation import evaluate_policy
 class SelfPlayCallback(BaseCallback):
     # TODO does having enough policies negate the need to only push better policies?
     def __init__(
@@ -44,8 +45,9 @@ class SelfPlayCallback(BaseCallback):
         starting_policy=None,
         *, 
         opponent_shuffle_freq=1000,
-        win_rate_threshold=0.55,
-        max_policies=500,
+        #win_rate_threshold=0.55,
+        reward_threshold=0.1, # translates to ~0.55 win rate
+        max_policies=50,
         **kwargs
     ):
 
@@ -57,31 +59,40 @@ class SelfPlayCallback(BaseCallback):
         self.opponent_shuffle_freq = opponent_shuffle_freq
         self.policy_switches = 0
         self.policy_pushes = 0
+        self.reward_threshold = reward_threshold
 
         super(SelfPlayCallback, self).__init__(
             self,
             #self.add_policy, 
             **kwargs)
 
-        self.current_player = DummyPlayer(
-            battle_embedder=embed_battle,
-            action_to_move=Gen8EnvSinglePlayer._action_to_move,
-        )
-        self.current_player.set_policy(self.model.policy)
-        self.old_player = DummyPlayer(
-            battle_embedder=embed_battle,
-            action_to_move=Gen8EnvSinglePlayer._action_to_move,
-        )
-        self.win_rate_threshold = win_rate_threshold
-
     @staticmethod
     def create(model):
         pass
 
     def battle_old_self(self):
-        self.current_player.reset_battles()
-        self.current_player.battle_against(self.old_player, 1000)
-        return self.current_player.win_rate()
+        # can't just loop since stacking is needed...
+        # TODO could set opponent policies to n_env previous policies
+        policy = self.policies[-1]
+        # TODO make better
+        if policy is not None:
+            policy.to(self.model.device)
+        self.envs.env_method('set_opponent_policy', policy=policy)
+        for idx in range(self.envs.num_envs):
+            if idx >= len(self.policies)-1:
+                break
+            rev_idx = (idx + 1) * -1
+            policy = self.policies[rev_idx]
+            if policy is not None:
+                policy.to(self.model.device)
+            self.envs.env_method('set_opponent_policy', indices=idx, policy=policy)
+        episode_rewards, episode_lengths = evaluate_policy(
+            self.model, 
+            self.envs, 
+            n_eval_episodes=200, 
+            return_episode_rewards=True,
+            deterministic=False)
+        return episode_rewards, episode_lengths
 
     def add_policy(self):
         ic()
@@ -91,9 +102,7 @@ class SelfPlayCallback(BaseCallback):
         #def predict(x):
             #return policy.predict(x, None, None, None)
             #return policy.predict(x, None, None, None)
-        policy_copy = deepcopy(self.model.policy)
-        self.policies.append(policy_copy) # TODO get policies on cpu...
-        self.old_player.set_policy(policy_copy)
+        self.policies.append(deepcopy(self.model.policy).cpu()) # TODO get policies on cpu...
 
         # Have to switch after to avoid segfault from old policy
         self.switch_opponents_policies()
@@ -104,12 +113,14 @@ class SelfPlayCallback(BaseCallback):
     
     
     def on_rollout_end(self) -> None:
-        ic()
-        ic(self.logger.name_to_value)
-        win_rate = self.battle_old_self()
-        self.logger.record('self_play/win_rate_vs_previous', win_rate)
-        if win_rate > self.win_rate_threshold:
+        ep_rewards, ep_lengths = self.battle_old_self()
+        self.logger.record("vs_old/avg_reward", np.mean(ep_rewards))
+        self.logger.record("vs_old/avg_length", np.mean(ep_lengths))
+
+
+        if np.mean(ep_rewards) > self.reward_threshold:
             self.add_policy()
+
         self.logger.record("self_play/n_policies", len(self.policies))
         self.logger.record("self_play/policy_switches", self.policy_switches)
         self.logger.record("self_play/policy_pushes", self.policy_pushes)
@@ -130,8 +141,8 @@ class SelfPlayCallback(BaseCallback):
         # maybe no race condition as opps are not currenlty moving
         for idx, policy in enumerate(polices):
             if policy is not None:
-                #policy.cpu()
-                pass
+                policy.to(self.model.device)
+
             self.envs.env_method('set_opponent_policy', indices=idx, policy=policy)
 
     def _on_step(self) -> bool:
@@ -140,12 +151,12 @@ class SelfPlayCallback(BaseCallback):
 
         return super()._on_step()
 
+# TODO could just create n opps for n policies and battle against all of them 100 times and average win rate
 
 # TODO could do boosting style with policies based on win rate?
 # RESEARCH TODO switching policies within games allow for more diverse strategies?
 # RESEARCH TODO is this similar to combining polcies? like genetic algorithm?
 # TODO can write get winrate for envs?
-
 
 # TODO pull out action to move to wrapper between move maker to reweight based on legal moves
 def policy_creator(model):
@@ -155,9 +166,9 @@ def policy_creator(model):
 
 # TODO move poke-envs to dict spaces
 
-N_ENVS = 8
+N_ENVS = 4
 # TODO why does going from 8->32 make python gpu processes expload?
-stack_size = 16
+STACK_SIZE = 16
 format = "gen8randombattle"
 #env_cls = DummyVecEnv
 env_cls = SubprocVecEnv
@@ -182,10 +193,28 @@ def train():
                 battle_embedder=embed_battle, 
                 action_to_move=Gen8EnvSinglePlayer._action_to_move,
                 #battle_embedder=lambda x: torch.tensor(embed_battle(x)), 
-                stack_size=stack_size,
+                stack_size=STACK_SIZE,
             ),
             battle_embedder=embed_battle, 
-            stack_size=stack_size,
+            stack_size=STACK_SIZE,
+        ),
+    )
+    # TODO just use regular env?
+    self_env = make_vec_env(
+        'Pokemon-v8', 
+        n_envs=N_ENVS, 
+        seed=0, 
+        vec_env_cls=env_cls, 
+        env_kwargs=dict(
+            opponent_cls=DummyPlayer, 
+            opponent_kwargs=dict(
+                battle_format=format,
+                battle_embedder=embed_battle, 
+                action_to_move=Gen8EnvSinglePlayer._action_to_move,
+                stack_size=STACK_SIZE,
+            ),
+            battle_embedder=embed_battle, 
+            stack_size=STACK_SIZE,
         ),
     )
     ic(env.observation_space)
@@ -203,7 +232,7 @@ def train():
             opponent_kwargs=dict(
                 battle_format='gen8randombattle'),
             battle_embedder=embed_battle, 
-            stack_size=stack_size,
+            stack_size=STACK_SIZE,
         )
     )
     # TODO pull out embedings since procs seem to rebuilding them
@@ -214,7 +243,7 @@ def train():
         policy_creator=policy_creator,
         # NOTE can't retrieve opponent due to event loop
         #opponents_policy_setter=env.get_attr('get_opponent_policy_setter'),
-        envs=env,
+        envs=self_env,
         #opponents=[],
         opponent_shuffle_freq=400, # 10000 ~= 2000 games (<60 moves)  
     )
@@ -249,8 +278,11 @@ def train():
             weather_embedding=e.weather_embedding,
             moves_net=mn,
             pokes_net=pn,
-            hidden_dim=128, 
-            n_actions=128)
+            #hidden_dim=128, 
+            n_actions=1456*STACK_SIZE,
+            hidden_dim=1456,
+            #n_actions=128)
+        )
     )
 
     # TODO for torch, deep is way slower than wide...

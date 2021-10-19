@@ -218,15 +218,15 @@ class PokeMLP(BaseFeaturesExtractor):
         layers.append(nn.Flatten(1))
         #layers.append(nn.Linear((frame_dim)*final_conv_dim, hidden_dim))
         #layers.append(nn.Linear((frame_dim//4)*final_conv_dim, hidden_dim))
-        layers.append(nn.Linear((frame_dim)*input_shape[0], hidden_dim))
-        layers.append(nn.LeakyReLU())
-        for _ in range(num_dense_layers-1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
+        #layers.append(nn.Linear((frame_dim)*input_shape[0], hidden_dim))
+        #layers.append(nn.LeakyReLU())
+        #for _ in range(num_dense_layers-1):
+            #layers.append(nn.Linear(hidden_dim, hidden_dim))
             #layers.append(nn.LazyLinear(hidden_dim))
-            layers.append(nn.LeakyReLU())
+            #layers.append(nn.LeakyReLU())
         #layers.append(nn.LazyLinear(hidden_dim, n_actions))
         #layers.append(nn.Linear(hidden_dim, n_actions))
-        layers.append(nn.Linear(hidden_dim, n_actions))
+        #layers.append(nn.Linear(hidden_dim, n_actions))
         self.net = nn.Sequential(*layers)
 
 

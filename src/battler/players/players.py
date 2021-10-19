@@ -154,6 +154,19 @@ class WrappedPlayer(gym.Wrapper):
     def __getattr__(self, name):
         return getattr(self.env, name)
 
+def battle_stacker_builder(stack_size):
+    stacked_state = None
+    def embed(battle: AbstractBattle) -> np.ndarray:
+        nonlocal stacked_state
+        eb = embed_battle(battle)
+        if stacked_state is None:
+            stacked_state = deque([eb for _ in range(stack_size-1)], maxlen=stack_size)
+        stacked_state.append(eb)
+        result = np.stack(stacked_state)
+        if battle.finished:
+            stacked_state = None
+        return result
+    return embed
 class RLPlayer8(Gen8EnvSinglePlayer):
     def __init__(
         self, 
